@@ -147,6 +147,7 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - ✅ Chapter-based episode splitting with mkvmerge `--split parts:`
 - ✅ Bundled test fixtures (62 tests, no env var needed)
 - ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`
+- ✅ Plex/Jellyfin-compatible default naming (`{name} - S01Exx.mkv`, `{name} - S00Exx - {category}.mkv`)
 
 ## Agent Tips
 - When modifying parsers, test against real BDMV data (set `BDPL_TEST_BDMV` env var)
