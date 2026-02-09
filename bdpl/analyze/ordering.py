@@ -78,6 +78,120 @@ def _episodes_from_play_all(
     return episodes
 
 
+def _episodes_from_chapters(
+    playlist: Playlist,
+) -> list[Episode]:
+    """Split a single long playlist into episodes using chapter marks.
+
+    Used when a playlist contains one (or few) very long play item(s) with
+    multiple episodes encoded back-to-back, distinguishable only by chapters.
+
+    Heuristic: group consecutive chapters into blocks whose total duration
+    falls within episode range (10–45 min). When a running block exceeds the
+    expected episode length, start a new episode at the chapter boundary.
+    """
+    if not playlist.chapters or len(playlist.chapters) < 4:
+        return []
+
+    # Only consider chapters on the main play item (item_ref=0 typically)
+    # Build list of (chapter_index, start_time_ms)
+    main_item = playlist.play_items[0]
+    base_ms = ticks_to_ms(main_item.in_time)
+
+    ch_times: list[float] = []
+    for ch in playlist.chapters:
+        ch_ms = ticks_to_ms(ch.timestamp)
+        ch_times.append(ch_ms)
+
+    # Compute total playlist duration
+    total_dur_ms = playlist.duration_ms
+    # Estimate episode count from total duration
+    # Typical anime episode: 22–26 min; try to find the best fit
+    est_ep_dur_ms = 25 * 60 * 1000  # 25 minutes as starting estimate
+    est_count = max(1, round(total_dur_ms / est_ep_dur_ms))
+
+    if est_count <= 1:
+        return []  # Not worth splitting
+
+    # Target duration per episode
+    target_dur_ms = total_dur_ms / est_count
+    # Tolerance: 60% to 140% of target
+    min_ep_ms = target_dur_ms * 0.60
+    max_ep_ms = target_dur_ms * 1.40
+
+    # Greedily group chapters into episodes.
+    # At each candidate split point, compare "split here" vs "include next
+    # chapter" and pick whichever is closer to the target duration.
+    episodes: list[Episode] = []
+    ep_start_ms = ch_times[0]
+    ep_start_idx = 0
+
+    for i in range(1, len(ch_times)):
+        block_dur = ch_times[i] - ep_start_ms
+
+        if block_dur >= min_ep_ms:
+            # How far is current block from target?
+            undershoot = abs(block_dur - target_dur_ms)
+            # How far would we be if we include the next chapter?
+            if i + 1 < len(ch_times):
+                next_dur = ch_times[i + 1] - ep_start_ms
+                overshoot = abs(next_dur - target_dur_ms)
+            else:
+                overshoot = float("inf")
+
+            # Split here if this is closer to target than including
+            # the next chapter, or if next chapter would exceed max
+            if undershoot <= overshoot or block_dur > max_ep_ms:
+                ep_num = len(episodes) + 1
+                seg = SegmentRef(
+                    key=(main_item.clip_id, round(ep_start_ms), round(ch_times[i])),
+                    clip_id=main_item.clip_id,
+                    in_ms=ep_start_ms,
+                    out_ms=ch_times[i],
+                    duration_ms=block_dur,
+                    label="BODY",
+                )
+                episodes.append(
+                    Episode(
+                        episode=ep_num,
+                        playlist=playlist.mpls,
+                        duration_ms=block_dur,
+                        confidence=0.6,
+                        segments=[seg],
+                    )
+                )
+                ep_start_ms = ch_times[i]
+                ep_start_idx = i
+
+    # Handle remaining chapters as final episode (if substantial)
+    remaining_ms = ticks_to_ms(main_item.out_time) - ep_start_ms
+    if remaining_ms >= min_ep_ms and ep_start_idx < len(ch_times) - 1:
+        ep_num = len(episodes) + 1
+        out_ms = ticks_to_ms(main_item.out_time)
+        seg = SegmentRef(
+            key=(main_item.clip_id, round(ep_start_ms), round(out_ms)),
+            clip_id=main_item.clip_id,
+            in_ms=ep_start_ms,
+            out_ms=out_ms,
+            duration_ms=remaining_ms,
+            label="BODY",
+        )
+        episodes.append(
+            Episode(
+                episode=ep_num,
+                playlist=playlist.mpls,
+                duration_ms=remaining_ms,
+                confidence=0.6,
+                segments=[seg],
+            )
+        )
+
+    # Only accept if we got the expected number of episodes (±1)
+    if abs(len(episodes) - est_count) <= 1 and len(episodes) >= 2:
+        return episodes
+    return []
+
+
 def order_episodes(
     playlists: list[Playlist],
     play_all_playlists: list[Playlist],
@@ -105,6 +219,11 @@ def order_episodes(
     if play_all_playlists:
         best_pa = max(play_all_playlists, key=lambda p: p.duration_ms)
         pa_episodes = _episodes_from_play_all(best_pa)
+        # If play-all decomposition yields only 1 episode, try chapter-based
+        if len(pa_episodes) <= 1 and best_pa.chapters:
+            ch_episodes = _episodes_from_chapters(best_pa)
+            if len(ch_episodes) > len(pa_episodes):
+                pa_episodes = ch_episodes
 
     # Strategy 1: use individual episode playlists — but only if they
     # look like real episodes and not just long extras.
@@ -120,6 +239,13 @@ def order_episodes(
         return _episodes_from_individual(individual_eps)
 
     if individual_eps:
+        # Strategy 3: if only one "episode" but it's very long with chapters,
+        # it likely contains multiple episodes in a single m2ts
+        if len(individual_eps) == 1:
+            candidate = individual_eps[0]
+            ch_episodes = _episodes_from_chapters(candidate)
+            if len(ch_episodes) >= 2:
+                return ch_episodes
         return _episodes_from_individual(individual_eps)
 
     if pa_episodes:
