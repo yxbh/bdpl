@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from bdpl.model import ClipInfo, DiscAnalysis, Playlist, Warning
@@ -16,6 +17,8 @@ from bdpl.analyze.segment_graph import (
 from bdpl.analyze.classify import label_segments, classify_playlists
 from bdpl.analyze.ordering import order_episodes
 from bdpl.analyze.explain import explain_disc
+
+log = logging.getLogger(__name__)
 
 __all__ = [
     "compute_signatures",
@@ -33,6 +36,62 @@ __all__ = [
 ]
 
 
+def _parse_disc_hints(bdmv_path: Path) -> dict:
+    """Parse index.bdmv and MovieObject.bdmv for navigation hints.
+
+    Returns a dict with 'title_playlists' (title# → playlist#) mapping
+    and raw parsed objects, or empty dict on failure.
+    """
+    hints: dict = {}
+
+    # --- index.bdmv ---
+    index_file = bdmv_path / "index.bdmv"
+    if index_file.is_file():
+        try:
+            from bdpl.bdmv.index_bdmv import parse_index_bdmv
+            idx = parse_index_bdmv(index_file)
+            hints["index"] = {
+                "first_playback_obj": idx.first_playback_obj,
+                "top_menu_obj": idx.top_menu_obj,
+                "titles": [
+                    {"title": t.title_num, "movie_object": t.movie_object_id}
+                    for t in idx.titles
+                ],
+            }
+        except Exception:
+            log.debug("Failed to parse index.bdmv", exc_info=True)
+
+    # --- MovieObject.bdmv ---
+    mobj_file = bdmv_path / "MovieObject.bdmv"
+    if mobj_file.is_file():
+        try:
+            from bdpl.bdmv.movieobject_bdmv import parse_movieobject_bdmv
+            mo = parse_movieobject_bdmv(mobj_file)
+            # Build title → playlist mapping via index titles → movie objects
+            obj_playlists: dict[int, list[int]] = {}
+            for obj in mo.objects:
+                if obj.referenced_playlists:
+                    obj_playlists[obj.object_id] = obj.referenced_playlists
+            hints["movie_objects"] = {
+                "count": len(mo.objects),
+                "obj_playlists": obj_playlists,
+            }
+        except Exception:
+            log.debug("Failed to parse MovieObject.bdmv", exc_info=True)
+
+    # Combine: resolve title → playlist via title → obj → playlist
+    if "index" in hints and "movie_objects" in hints:
+        obj_pl = hints["movie_objects"]["obj_playlists"]
+        title_playlists: dict[int, list[int]] = {}
+        for t in hints["index"]["titles"]:
+            obj_id = t["movie_object"]
+            if obj_id in obj_pl:
+                title_playlists[t["title"]] = obj_pl[obj_id]
+        hints["title_playlists"] = title_playlists
+
+    return hints
+
+
 def scan_disc(
     bdmv_path: str | Path,
     playlists: list[Playlist],
@@ -41,6 +100,12 @@ def scan_disc(
     """Run the full analysis pipeline and return a DiscAnalysis."""
     warnings: list[Warning] = []
     analysis: dict = {}
+    bdmv = Path(bdmv_path)
+
+    # 0. Parse navigation hints (index.bdmv + MovieObject.bdmv)
+    hints = _parse_disc_hints(bdmv)
+    if hints:
+        analysis["disc_hints"] = hints
 
     # 1. Deduplicate playlists
     dup_groups = find_duplicates(playlists)
@@ -102,6 +167,23 @@ def scan_disc(
                 pl = next((p for p in unique_playlists if p.mpls == mpls), None)
                 if pl and not any(pi.clip_id in ep_clip_ids for pi in pl.play_items):
                     classifications[mpls] = "extra"
+
+    # 6b. Boost confidence when navigation hints confirm episode playlists
+    title_pl = hints.get("title_playlists", {})
+    if title_pl and episodes:
+        # Build set of playlist numbers referenced by titles
+        hint_playlist_nums: set[int] = set()
+        for pls in title_pl.values():
+            hint_playlist_nums.update(pls)
+
+        for ep in episodes:
+            # Extract playlist number from name like "00002.mpls" → 2
+            try:
+                pl_num = int(ep.playlist.split(".")[0])
+            except (ValueError, IndexError):
+                continue
+            if pl_num in hint_playlist_nums:
+                ep.confidence = min(1.0, ep.confidence + 0.1)
 
     if not episodes:
         warnings.append(
