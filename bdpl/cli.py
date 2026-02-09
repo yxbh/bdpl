@@ -124,12 +124,12 @@ def playlist_cmd(
 def remux(
     bdmv: str = typer.Argument(..., help="Path to BDMV directory"),
     out: str = typer.Option("./Episodes", "--out", help="Output directory"),
-    pattern: str = typer.Option("Episode_{ep:02d}.mkv", "--pattern", help="Output filename pattern"),
+    pattern: str = typer.Option("{name} - S01E{ep:02d}.mkv", "--pattern", help="Output filename pattern ({name}=disc folder, {ep}=episode number)"),
     specials: bool = typer.Option(False, "--specials", help="Also remux special features"),
     specials_pattern: str = typer.Option(
-        "Special_{idx:02d}_{category}.mkv",
+        "{name} - S00E{idx:02d} - {category}.mkv",
         "--specials-pattern",
-        help="Filename pattern for special features",
+        help="Filename pattern for special features ({name}=disc folder, {idx}=index, {category}=type)",
     ),
     mkvmerge_path: str = typer.Option(None, "--mkvmerge-path", help="Path to mkvmerge executable"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print commands without executing"),

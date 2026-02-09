@@ -62,10 +62,10 @@ Produce one MKV per episode using an external muxer (default: `mkvmerge`).
 
 ```bash
 bdpl remux /path/to/BDMV --episodes disc.json --out ./Episodes
-bdpl remux /path/to/BDMV --out ./Episodes --pattern "S01E{ep:02d}.mkv"
+bdpl remux /path/to/BDMV --out ./Episodes --pattern "My Show (2024) - S01E{ep:02d}.mkv"
 bdpl remux /path/to/BDMV --dry-run
 bdpl remux /path/to/BDMV --specials              # include special features
-bdpl remux /path/to/BDMV --specials --specials-pattern "Extra_{idx:02d}_{category}.mkv"
+bdpl remux /path/to/BDMV --specials --specials-pattern "My Show - S00E{idx:02d} - {category}.mkv"
 ```
 
 Behavior:
@@ -318,7 +318,8 @@ For each episode:
   - `--prefer-subs eng`
 - Write chapters if available:
   - if chapter marks exist in playlist, translate to mkv chapters
-- Name files using `--pattern`
+- Name files using `--pattern` (default: `{name} - S01E{ep:02d}.mkv`, Plex/Jellyfin-compatible)
+- `{name}` auto-derived from BDMV parent folder; specials use Season 00 (`S00Exx`)
 
 ### 7.3 Dry-run and reproducibility
 - `--dry-run` prints commands only
@@ -383,7 +384,7 @@ Use `rich` tables optionally for readability.
 - [x] `playlist` command (.m3u debug playlists)
 - [x] `--dry-run` on remux command (CLI display)
 - [ ] `remux_plan.json` export (machine-readable dry-run output)
-- [x] Output file naming from `--pattern` (inline in CLI + mkv_chapters)
+- [x] Output file naming from `--pattern` — Plex/Jellyfin-compatible `SxxExx` defaults with `{name}` from disc folder
 - [ ] `remux/ffmpeg.py` — optional ffmpeg concat fallback
 
 ### v0.4 — Robustness + extras
