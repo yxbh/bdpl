@@ -67,4 +67,37 @@ def explain_disc(analysis: DiscAnalysis) -> str:
             lines.append(f"  [{w.code}] {w.message}")
         lines.append("")
 
+    # Disc hints (navigation metadata)
+    hints = analysis.analysis.get("disc_hints", {})
+    if hints:
+        lines.append("Disc hints:")
+        idx = hints.get("index", {})
+        if idx:
+            titles = idx.get("titles", [])
+            lines.append(f"  index.bdmv: {len(titles)} title(s)")
+        mo = hints.get("movie_objects", {})
+        if mo:
+            obj_pl = mo.get("obj_playlists", {})
+            lines.append(
+                f"  MovieObject.bdmv: {mo.get('count', '?')} object(s), "
+                f"{len(obj_pl)} with playlist refs"
+            )
+        tp = hints.get("title_playlists", {})
+        if tp:
+            mappings = ", ".join(
+                f"T{t}->{','.join(f'{p:05d}.mpls' for p in pls)}"
+                for t, pls in sorted(tp.items())
+            )
+            lines.append(f"  Title→playlist: {mappings}")
+        ig = hints.get("ig_menu", {})
+        if ig:
+            marks = ig.get("chapter_marks", [])
+            parts = [f"{ig.get('hint_count', 0)} button action(s)"]
+            if marks:
+                parts.append(f"chapter marks={marks}")
+            if ig.get("has_direct_play"):
+                parts.append("has direct PlayPL")
+            lines.append(f"  IG menu: {', '.join(parts)}")
+        lines.append("")
+
     return "\n".join(lines)

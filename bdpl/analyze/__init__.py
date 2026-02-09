@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from bdpl.model import ClipInfo, DiscAnalysis, Playlist, Warning
+from bdpl.model import ClipInfo, DiscAnalysis, Playlist, Warning, ticks_to_ms
 
 from bdpl.analyze.signatures import compute_signatures, find_duplicates
 from bdpl.analyze.clustering import cluster_by_duration, pick_representative
@@ -36,11 +36,11 @@ __all__ = [
 ]
 
 
-def _parse_disc_hints(bdmv_path: Path) -> dict:
-    """Parse index.bdmv and MovieObject.bdmv for navigation hints.
+def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None) -> dict:
+    """Parse index.bdmv, MovieObject.bdmv, and IG menu streams for hints.
 
-    Returns a dict with 'title_playlists' (title# → playlist#) mapping
-    and raw parsed objects, or empty dict on failure.
+    Returns a dict with 'title_playlists' (title# → playlist#) mapping,
+    IG menu hints, and raw parsed objects, or empty dict on failure.
     """
     hints: dict = {}
 
@@ -89,7 +89,61 @@ def _parse_disc_hints(bdmv_path: Path) -> dict:
                 title_playlists[t["title"]] = obj_pl[obj_id]
         hints["title_playlists"] = title_playlists
 
+    # --- IG stream (experimental) ---
+    if clips:
+        try:
+            _parse_ig_hints(bdmv_path, clips, hints)
+        except Exception:
+            log.debug("Failed to parse IG menu hints", exc_info=True)
+
     return hints
+
+
+def _parse_ig_hints(
+    bdmv_path: Path, clips: dict[str, ClipInfo], hints: dict
+) -> None:
+    """Try to parse IG menu streams and add hints in-place."""
+    from bdpl.bdmv.ig_stream import parse_ig_from_m2ts, extract_menu_hints
+
+    stream_dir = bdmv_path / "STREAM"
+    if not stream_dir.is_dir():
+        return
+
+    # Find clips with IG streams (stream_type 0x91)
+    ig_clips = [
+        clip_id
+        for clip_id, clip in clips.items()
+        if any(s.stream_type == 0x91 for s in clip.streams)
+    ]
+    if not ig_clips:
+        return
+
+    all_ig_hints = []
+    for clip_id in ig_clips:
+        m2ts = stream_dir / f"{clip_id}.m2ts"
+        if not m2ts.is_file():
+            continue
+        ics = parse_ig_from_m2ts(m2ts)
+        if ics is None:
+            continue
+        page_hints = extract_menu_hints(ics)
+        if page_hints:
+            all_ig_hints.extend(page_hints)
+            log.debug(
+                "IG clip %s: %d pages, %d actionable buttons",
+                clip_id, len(ics.pages), len(page_hints),
+            )
+
+    if all_ig_hints:
+        hints["ig_menu"] = {
+            "hint_count": len(all_ig_hints),
+            "chapter_marks": sorted(set(
+                h.register_sets.get(2)
+                for h in all_ig_hints
+                if 2 in h.register_sets
+            )),
+            "has_direct_play": any(h.playlist is not None for h in all_ig_hints),
+        }
 
 
 def scan_disc(
@@ -103,7 +157,7 @@ def scan_disc(
     bdmv = Path(bdmv_path)
 
     # 0. Parse navigation hints (index.bdmv + MovieObject.bdmv)
-    hints = _parse_disc_hints(bdmv)
+    hints = _parse_disc_hints(bdmv, clips)
     if hints:
         analysis["disc_hints"] = hints
 
@@ -184,6 +238,33 @@ def scan_disc(
                 continue
             if pl_num in hint_playlist_nums:
                 ep.confidence = min(1.0, ep.confidence + 0.1)
+
+    # 6c. Boost confidence when IG chapter marks confirm episode boundaries
+    ig_menu = hints.get("ig_menu", {})
+    ig_marks = ig_menu.get("chapter_marks")
+    if ig_marks and episodes and len(ig_marks) >= 2:
+        # Build list of chapter-start indices for each episode
+        # (episode starts at the chapter whose timestamp matches ep.segments[0].in_ms)
+        ep_playlist = episodes[0].playlist
+        match_pl = next(
+            (p for p in unique_playlists if p.mpls == ep_playlist), None
+        )
+        if match_pl and match_pl.chapters:
+            ch_times = [ticks_to_ms(ch.timestamp) for ch in match_pl.chapters]
+            ep_start_indices: list[int] = []
+            for ep in episodes:
+                seg_in = ep.segments[0].in_ms
+                # Find the chapter index closest to this episode start
+                best_idx = min(
+                    range(len(ch_times)),
+                    key=lambda j: abs(ch_times[j] - seg_in),
+                )
+                if abs(ch_times[best_idx] - seg_in) < 500:  # within 500ms
+                    ep_start_indices.append(best_idx)
+
+            if sorted(ep_start_indices) == sorted(ig_marks[: len(ep_start_indices)]):
+                for ep in episodes:
+                    ep.confidence = min(1.0, ep.confidence + 0.1)
 
     if not episodes:
         warnings.append(

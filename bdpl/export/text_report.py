@@ -70,4 +70,37 @@ def text_report(analysis: DiscAnalysis) -> str:
             lines.append(f"  [{w.code}] {w.message}")
         lines.append("")
 
+    # Disc hints
+    hints = analysis.analysis.get("disc_hints", {})
+    if hints:
+        lines.append("-" * 60)
+        lines.append("Disc Hints")
+        lines.append("-" * 60)
+        idx = hints.get("index", {})
+        if idx:
+            titles = idx.get("titles", [])
+            lines.append(f"  index.bdmv:       {len(titles)} title(s)")
+        mo = hints.get("movie_objects", {})
+        if mo:
+            obj_pl = mo.get("obj_playlists", {})
+            lines.append(
+                f"  MovieObject.bdmv: {mo.get('count', '?')} object(s), "
+                f"{len(obj_pl)} with playlist refs"
+            )
+        tp = hints.get("title_playlists", {})
+        if tp:
+            for t, pls in sorted(tp.items()):
+                pl_str = ", ".join(f"{p:05d}.mpls" for p in pls)
+                lines.append(f"    Title {t} -> {pl_str}")
+        ig = hints.get("ig_menu", {})
+        if ig:
+            marks = ig.get("chapter_marks", [])
+            parts = [f"{ig.get('hint_count', 0)} button action(s)"]
+            if marks:
+                parts.append(f"chapter marks={marks}")
+            if ig.get("has_direct_play"):
+                parts.append("direct PlayPL")
+            lines.append(f"  IG menu:          {', '.join(parts)}")
+        lines.append("")
+
     return "\n".join(lines)

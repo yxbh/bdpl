@@ -17,7 +17,8 @@ bdpl/
 │   │   ├── mpls.py          # MPLS (Movie PlayList) parser
 │   │   ├── clpi.py          # CLPI (Clip Information) parser
 │   │   ├── index_bdmv.py    # index.bdmv parser (title→movie object mapping)
-│   │   └── movieobject_bdmv.py # MovieObject.bdmv parser (navigation commands)
+│   │   ├── movieobject_bdmv.py # MovieObject.bdmv parser (navigation commands)
+│   │   └── ig_stream.py     # [EXPERIMENTAL] IG menu stream parser (button→action)
 │   ├── analyze/
 │   │   ├── __init__.py      # scan_disc() — main analysis pipeline
 │   │   ├── signatures.py    # Playlist signature computation & dedup
@@ -40,6 +41,8 @@ bdpl/
 │   ├── test_clpi_parse.py   # CLPI parser tests (real BDMV data)
 │   ├── test_index_bdmv.py   # index.bdmv parser tests
 │   ├── test_movieobject_bdmv.py # MovieObject.bdmv parser tests
+│   ├── test_ig_stream.py    # IG stream parser tests (ICS fixture)
+│   ├── test_chapter_split.py # Chapter-based episode splitting tests
 │   ├── test_scan.py         # Full scan pipeline integration tests
 │   └── test_cli.py          # CLI subprocess tests
 ├── pyproject.toml           # Build config, deps (typer, rich, pytest)
@@ -59,18 +62,29 @@ bdpl/
 
 ### Analysis Pipeline (`scan_disc()`)
 1. Parse index.bdmv and MovieObject.bdmv for navigation hints (title→playlist mapping)
-2. Parse all MPLS and CLPI files
-3. Compute playlist signatures for deduplication
-4. Cluster by duration to find episode-length playlists
-5. Detect "Play All" playlists (supersets of other playlists)
-6. Label segments (LEGAL, OP, ED, BODY, PREVIEW)
-7. Classify playlists (episode, play_all, bumper, creditless_op, etc.)
-8. Infer episode order — either from individual playlists or by decomposing Play All
-9. Boost confidence when navigation hints confirm episode playlists
+2. Parse IG menu streams for button→action hints (experimental)
+3. Parse all MPLS and CLPI files
+4. Compute playlist signatures for deduplication
+5. Cluster by duration to find episode-length playlists
+6. Detect "Play All" playlists (supersets of other playlists)
+7. Label segments (LEGAL, OP, ED, BODY, PREVIEW)
+8. Classify playlists (episode, play_all, bumper, creditless_op, etc.)
+9. Infer episode order — individual playlists, Play All decomposition, or chapter splitting
+10. Boost confidence when navigation hints confirm episode playlists
 
 ### Episode Inference Strategies
 - **Individual episodes**: When each episode has its own MPLS playlist
 - **Play All decomposition**: When only a concatenated playlist exists, decompose its play items into separate episodes (common on anime BDs)
+- **Chapter-based splitting**: When a disc has a single long m2ts with multiple chapters, split into episodes using chapter boundaries and target duration heuristics
+
+### IG Menu Parsing (Experimental)
+Blu-ray IG (Interactive Graphics) menus contain buttons with HDMV navigation commands.
+These can reveal episode→chapter mappings embedded in the disc menu structure:
+- **Direct PlayPL**: Button plays a specific playlist (possibly at a specific mark)
+- **Register-based**: Buttons SET GPR registers to values that map to episodes/chapters, then other buttons use those registers for playback
+- Parsed from PID 0x1400-0x141F in menu m2ts clips
+- ICS (Interactive Composition Segment) contains pages → BOGs → buttons → nav commands
+- Nav commands use the same 12-byte HDMV instruction set as MovieObject.bdmv
 
 ## Development
 
@@ -93,7 +107,7 @@ bdpl playlist /path/to/BDMV --out ./Playlists
 pytest tests/ -v
 ```
 
-Tests use the `BDPL_TEST_BDMV` environment variable to locate a real BDMV directory for integration tests. Unit tests (test_reader.py) use synthetic data and need no external files.
+Tests use bundled fixture data from `tests/fixtures/disc1/` and `tests/fixtures/disc2/` by default. Set `BDPL_TEST_BDMV` to override with a real BDMV directory.
 
 ```bash
 # Run all tests (unit tests always run; integration tests need a BDMV)
@@ -118,15 +132,18 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - Robust error handling — parsers should not crash on malformed data
 - All times in models: 45 kHz ticks (raw) or milliseconds (derived)
 
-## Current Status: v0.2+
+## Current Status: v0.3+
 - ✅ MPLS parser (play items, chapters, streams)
 - ✅ CLPI parser (stream types, codecs, languages)
 - ✅ index.bdmv parser (title→movie object mapping)
 - ✅ MovieObject.bdmv parser (navigation commands, playlist references)
-- ✅ Full analysis pipeline with navigation hints integration
-- ✅ Episode inference (individual playlists + Play All decomposition)
+- ✅ IG stream parser [experimental] (menu button commands, episode hints)
+- ✅ Full analysis pipeline with navigation hints + IG integration
+- ✅ Episode inference (individual playlists + Play All + chapter splitting)
 - ✅ JSON export, text reports, M3U playlists
 - ✅ MKV remux with chapters + track names (via mkvmerge)
+- ✅ Chapter-based episode splitting with mkvmerge `--split parts:`
+- ✅ Bundled test fixtures (62 tests, no env var needed)
 - ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`
 
 ## Agent Tips
@@ -134,3 +151,14 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - The analysis pipeline is in `analyze/__init__.py:scan_disc()` — this orchestrates everything
 - Playlist classifications are heuristic-based; new disc patterns may need new rules
 - Segment keys use quantization (default ±250ms) to handle tiny timing variances
+
+## Copyright & Fixture Guidelines
+- **NEVER commit copyrighted media content** (m2ts video/audio streams, full disc images, cover art, subtitle tracks, etc.) to the repository.
+- **Test fixtures** in `tests/fixtures/` contain only small structural metadata files (MPLS, CLPI, index.bdmv, MovieObject.bdmv, ICS segments) — these are binary headers/indexes, not audiovisual content.
+- When adding new disc fixtures, include **only** the minimum metadata needed for tests. Strip or exclude:
+  - `BDMV/STREAM/*.m2ts` (media streams — never commit these)
+  - `BDMV/AUXDATA/` (thumbnails, sound effects)
+  - `BDMV/JAR/` (BD-J applications)
+  - `BDMV/BACKUP/` (redundant copies)
+- Keep fixture files small (a few KB per file, under 100KB per disc)
+- Name fixture directories generically (disc1, disc2, etc.) — do not include disc titles, product codes, or other identifying information that ties fixtures to specific copyrighted works
