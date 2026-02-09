@@ -61,6 +61,19 @@ def text_report(analysis: DiscAnalysis) -> str:
             )
         lines.append("")
 
+    # Special Features
+    if analysis.special_features:
+        lines.append("-" * 60)
+        lines.append(f"Special Features ({len(analysis.special_features)})")
+        lines.append("-" * 60)
+        for sf in analysis.special_features:
+            ch_str = f"  ch.{sf.chapter_start}" if sf.chapter_start is not None else ""
+            lines.append(
+                f"  {sf.index:>2}. {sf.playlist}{ch_str}"
+                f"  {format_duration(sf.duration_ms):>10}  {sf.category}"
+            )
+        lines.append("")
+
     # Warnings
     if analysis.warnings:
         lines.append("-" * 60)

@@ -111,6 +111,17 @@ class Episode:
 
 
 @dataclass(slots=True)
+class SpecialFeature:
+    """A non-episode special feature detected from disc menu structure."""
+
+    index: int  # 1-based display order
+    playlist: str  # MPLS filename
+    duration_ms: float
+    category: str  # creditless_op, creditless_ed, extra, preview, etc.
+    chapter_start: int | None = None  # chapter index if feature is part of a multi-feature playlist
+
+
+@dataclass(slots=True)
 class Warning:
     code: str
     message: str
@@ -124,4 +135,5 @@ class DiscAnalysis:
     clips: dict[str, ClipInfo]
     episodes: list[Episode]
     warnings: list[Warning]
+    special_features: list[SpecialFeature] = field(default_factory=list)
     analysis: dict = field(default_factory=dict)
