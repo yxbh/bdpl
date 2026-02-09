@@ -151,3 +151,14 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - The analysis pipeline is in `analyze/__init__.py:scan_disc()` — this orchestrates everything
 - Playlist classifications are heuristic-based; new disc patterns may need new rules
 - Segment keys use quantization (default ±250ms) to handle tiny timing variances
+
+## Copyright & Fixture Guidelines
+- **NEVER commit copyrighted media content** (m2ts video/audio streams, full disc images, cover art, subtitle tracks, etc.) to the repository.
+- **Test fixtures** in `tests/fixtures/` contain only small structural metadata files (MPLS, CLPI, index.bdmv, MovieObject.bdmv, ICS segments) — these are binary headers/indexes, not audiovisual content.
+- When adding new disc fixtures, include **only** the minimum metadata needed for tests. Strip or exclude:
+  - `BDMV/STREAM/*.m2ts` (media streams — never commit these)
+  - `BDMV/AUXDATA/` (thumbnails, sound effects)
+  - `BDMV/JAR/` (BD-J applications)
+  - `BDMV/BACKUP/` (redundant copies)
+- Keep fixture files small (a few KB per file, under 100KB per disc)
+- Name fixture directories generically (disc1, disc2, etc.) — do not include disc titles, product codes, or other identifying information that ties fixtures to specific copyrighted works
