@@ -372,20 +372,22 @@ Use `rich` tables optionally for readability.
 - [x] Stronger episode ordering logic + confidence scoring
 - [x] Explain improvements (reasons, alternative clusters)
 
-### v0.3 — Remux + playlists (in progress)
-- [ ] `remux` with mkvmerge integration (`remux/mkvmerge.py`)
+### v0.3 — Remux + playlists (mostly complete)
+- [x] `remux` with mkvmerge integration (implemented in `export/mkv_chapters.py`)
 - [ ] Track preference selection (`--prefer-audio`, `--prefer-subs`)
-- [ ] Chapter export when available
+- [x] Chapter export when available
 - [x] `playlist` command (.m3u debug playlists)
-- [ ] `--dry-run` and `remux_plan.json`
-- [ ] `remux/naming.py` — output file naming from `--pattern`
+- [x] `--dry-run` on remux command (CLI display)
+- [ ] `remux_plan.json` export (machine-readable dry-run output)
+- [x] Output file naming from `--pattern` (inline in CLI + mkv_chapters)
 - [ ] `remux/ffmpeg.py` — optional ffmpeg concat fallback
 
 ### v0.4 — Robustness + extras
-- [ ] `index.bdmv` parser — title mappings and top menu hints
-- [ ] `MovieObject.bdmv` parser — navigation command hints
+- [x] `index.bdmv` parser — title mappings and top menu hints
+- [x] `MovieObject.bdmv` parser — navigation command hints
+- [x] Navigation hints integrated into analysis pipeline (confidence boost)
+- [x] Bundled test fixtures (stripped MPLS/CLPI metadata — all tests run without env var)
 - [ ] `util/hashing.py` — disc fingerprint (hash of playlist filenames + sizes)
-- [ ] Synthetic test fixtures (no dependency on real BDMV for unit tests)
 - [ ] `CONTRIBUTING.md`
 
 ### Later / Optional
@@ -415,15 +417,17 @@ Use `rich` tables optionally for readability.
 
 ## 13. Implementation Status
 
-Completed 2026-02-08. All v0.1 + v0.2 items shipped. 40 tests passing.
+Updated 2026-02-09. v0.1 + v0.2 complete. v0.3 mostly complete. v0.4 parsers done. 48 tests passing.
 
 Files implemented:
-- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` stub)
+- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux`)
 - `bdpl/model.py` — Dataclasses (Playlist, PlayItem, Episode, DiscAnalysis, etc.)
 - `bdpl/bdmv/reader.py` — Big-endian BinaryReader with zero-copy slicing
 - `bdpl/bdmv/mpls.py` — MPLS parser (play items, chapters, STN streams)
 - `bdpl/bdmv/clpi.py` — CLPI parser (stream PIDs, codecs, languages)
-- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator
+- `bdpl/bdmv/index_bdmv.py` — index.bdmv parser (title→movie object mapping)
+- `bdpl/bdmv/movieobject_bdmv.py` — MovieObject.bdmv parser (navigation commands, playlist refs)
+- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator + disc hint integration
 - `bdpl/analyze/signatures.py` — Signature computation + duplicate finding
 - `bdpl/analyze/clustering.py` — Duration-based clustering + representative picking
 - `bdpl/analyze/segment_graph.py` — Segment frequency + Play All detection
@@ -433,4 +437,9 @@ Files implemented:
 - `bdpl/export/json_out.py` — JSON export (`bdpl.disc.v1` schema)
 - `bdpl/export/text_report.py` — Plain text summary report
 - `bdpl/export/m3u.py` — M3U debug playlist generation
-- `tests/` — 40 tests (reader, mpls, clpi, scan pipeline, CLI)
+- `bdpl/export/mkv_chapters.py` — MKV remux with chapters + track names (via mkvmerge)
+- `tests/` — 48 tests (reader, mpls, clpi, index, movieobject, scan pipeline, CLI)
+
+Remaining work:
+- v0.3: `--prefer-audio`/`--prefer-subs`, `remux_plan.json`, `remux/ffmpeg.py`
+- v0.4: `util/hashing.py`, synthetic test fixtures, `CONTRIBUTING.md`

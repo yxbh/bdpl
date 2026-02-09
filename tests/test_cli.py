@@ -4,26 +4,25 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 PYTHON = sys.executable
-
-
-@pytest.fixture(autouse=True)
-def _skip_if_no_bdmv():
-    if not os.environ.get("BDPL_TEST_BDMV"):
-        pytest.skip("BDPL_TEST_BDMV not set – skipping CLI integration test")
+_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "disc1"
 
 
 def _bdmv() -> str:
-    """Resolve BDMV path from env var."""
-    from pathlib import Path
-
-    p = Path(os.environ["BDPL_TEST_BDMV"])
-    if (p / "BDMV" / "PLAYLIST").is_dir():
-        return str(p / "BDMV")
-    return str(p)
+    """Resolve BDMV path from env var or bundled fixtures."""
+    env = os.environ.get("BDPL_TEST_BDMV")
+    if env:
+        p = Path(env)
+        if (p / "BDMV" / "PLAYLIST").is_dir():
+            return str(p / "BDMV")
+        return str(p)
+    if (_FIXTURE_DIR / "PLAYLIST").is_dir():
+        return str(_FIXTURE_DIR)
+    pytest.skip("No BDMV fixtures available")
 
 
 class TestScanStdout:
