@@ -131,13 +131,17 @@ Remux episodes to MKV with chapters and named tracks. Requires `mkvmerge` (MKVTo
 
 ```bash
 bdpl remux /path/to/BDMV --out ./Episodes
-bdpl remux /path/to/BDMV --pattern "S01E{ep:02d}.mkv"
+bdpl remux /path/to/BDMV --pattern "My Show (2024) - S01E{ep:02d}.mkv"
 bdpl remux /path/to/BDMV --dry-run
 
 # Also remux special features (creditless OP/ED, extras, previews)
 bdpl remux /path/to/BDMV --specials
-bdpl remux /path/to/BDMV --specials --specials-pattern "Extra_{idx:02d}_{category}.mkv"
+bdpl remux /path/to/BDMV --specials --specials-pattern "My Show - S00E{idx:02d} - {category}.mkv"
 ```
+
+Default filenames use Plex/Jellyfin-compatible `SxxExx` format with the disc folder name
+(e.g., `UCG_0080_D1 - S01E01.mkv`, `UCG_0080_D1 - S00E01 - creditless_op.mkv`).
+Pattern variables: `{name}` (disc folder), `{ep}` (episode #), `{idx}` (special #), `{category}` (special type).
 
 ## How It Works
 
