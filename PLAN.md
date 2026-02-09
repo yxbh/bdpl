@@ -382,8 +382,9 @@ Use `rich` tables optionally for readability.
 - [ ] `remux/ffmpeg.py` — optional ffmpeg concat fallback
 
 ### v0.4 — Robustness + extras
-- [ ] `index.bdmv` parser — title mappings and top menu hints
-- [ ] `MovieObject.bdmv` parser — navigation command hints
+- [x] `index.bdmv` parser — title mappings and top menu hints
+- [x] `MovieObject.bdmv` parser — navigation command hints
+- [x] Navigation hints integrated into analysis pipeline (confidence boost)
 - [ ] `util/hashing.py` — disc fingerprint (hash of playlist filenames + sizes)
 - [ ] Synthetic test fixtures (no dependency on real BDMV for unit tests)
 - [ ] `CONTRIBUTING.md`
@@ -415,7 +416,7 @@ Use `rich` tables optionally for readability.
 
 ## 13. Implementation Status
 
-Completed 2026-02-08. All v0.1 + v0.2 items shipped. 40 tests passing.
+Completed 2026-02-08. All v0.1 + v0.2 items shipped. v0.4 parsers added. 48 tests passing.
 
 Files implemented:
 - `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` stub)
@@ -423,7 +424,9 @@ Files implemented:
 - `bdpl/bdmv/reader.py` — Big-endian BinaryReader with zero-copy slicing
 - `bdpl/bdmv/mpls.py` — MPLS parser (play items, chapters, STN streams)
 - `bdpl/bdmv/clpi.py` — CLPI parser (stream PIDs, codecs, languages)
-- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator
+- `bdpl/bdmv/index_bdmv.py` — index.bdmv parser (title→movie object mapping)
+- `bdpl/bdmv/movieobject_bdmv.py` — MovieObject.bdmv parser (navigation commands, playlist refs)
+- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator + disc hint integration
 - `bdpl/analyze/signatures.py` — Signature computation + duplicate finding
 - `bdpl/analyze/clustering.py` — Duration-based clustering + representative picking
 - `bdpl/analyze/segment_graph.py` — Segment frequency + Play All detection
@@ -433,4 +436,4 @@ Files implemented:
 - `bdpl/export/json_out.py` — JSON export (`bdpl.disc.v1` schema)
 - `bdpl/export/text_report.py` — Plain text summary report
 - `bdpl/export/m3u.py` — M3U debug playlist generation
-- `tests/` — 40 tests (reader, mpls, clpi, scan pipeline, CLI)
+- `tests/` — 48 tests (reader, mpls, clpi, index, movieobject, scan pipeline, CLI)
