@@ -125,6 +125,12 @@ def remux(
     bdmv: str = typer.Argument(..., help="Path to BDMV directory"),
     out: str = typer.Option("./Episodes", "--out", help="Output directory"),
     pattern: str = typer.Option("Episode_{ep:02d}.mkv", "--pattern", help="Output filename pattern"),
+    specials: bool = typer.Option(False, "--specials", help="Also remux special features"),
+    specials_pattern: str = typer.Option(
+        "Special_{idx:02d}_{category}.mkv",
+        "--specials-pattern",
+        help="Filename pattern for special features",
+    ),
     mkvmerge_path: str = typer.Option(None, "--mkvmerge-path", help="Path to mkvmerge executable"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print commands without executing"),
 ):
@@ -133,8 +139,13 @@ def remux(
     Reads the source m2ts streams and produces one MKV per episode with
     chapter markers and named audio/subtitle tracks.  Requires mkvmerge
     (MKVToolNix).
+
+    Use --specials to also remux special features (creditless OP/ED, extras).
     """
-    from bdpl.export.mkv_chapters import export_chapter_mkv, get_dry_run_commands
+    from bdpl.export.mkv_chapters import (
+        export_chapter_mkv, get_dry_run_commands,
+        export_specials_mkv, get_specials_dry_run,
+    )
 
     analysis = _parse_and_analyze(bdmv)
 
@@ -146,10 +157,22 @@ def remux(
             console.print(f"  [dim]Chapters:[/dim]")
             for line in plan["chapters_xml"].splitlines()[:15]:
                 console.print(f"    {line}")
+        if specials:
+            sf_plans = get_specials_dry_run(analysis, out, pattern=specials_pattern)
+            for plan in sf_plans:
+                console.print(
+                    f"\n[bold]Special {plan['index']} ({plan['category']})[/bold]"
+                    f" → {plan['output']}"
+                )
+                console.print(f"  [dim]{' '.join(plan['command'])}[/dim]")
         return
 
     try:
         from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+
+        total_items = len(analysis.episodes)
+        if specials:
+            total_items += len(analysis.special_features)
 
         with Progress(
             SpinnerColumn(),
@@ -158,7 +181,7 @@ def remux(
             TaskProgressColumn(),
             console=console,
         ) as progress:
-            task_id = progress.add_task("Remuxing…", total=len(analysis.episodes))
+            task_id = progress.add_task("Remuxing…", total=total_items)
 
             def _on_progress(current: int, total: int, name: str) -> None:
                 progress.update(task_id, completed=current - 1, description=f"Remuxing {name}…")
@@ -167,7 +190,23 @@ def remux(
                 analysis, out, mkvmerge_path=mkvmerge_path,
                 on_progress=_on_progress, pattern=pattern,
             )
-            progress.update(task_id, completed=len(analysis.episodes), description="Done")
+            progress.update(task_id, completed=len(analysis.episodes))
+
+            if specials and analysis.special_features:
+                def _on_sf_progress(current: int, total: int, name: str) -> None:
+                    progress.update(
+                        task_id,
+                        completed=len(analysis.episodes) + current - 1,
+                        description=f"Remuxing {name}…",
+                    )
+
+                sf_created = export_specials_mkv(
+                    analysis, out, mkvmerge_path=mkvmerge_path,
+                    on_progress=_on_sf_progress, pattern=specials_pattern,
+                )
+                created.extend(sf_created)
+
+            progress.update(task_id, completed=total_items, description="Done")
     except RuntimeError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)

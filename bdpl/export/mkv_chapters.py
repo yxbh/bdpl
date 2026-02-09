@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from uuid import uuid4
 
-from bdpl.model import DiscAnalysis, Playlist, ticks_to_ms
+from bdpl.model import DiscAnalysis, Playlist, SpecialFeature, ticks_to_ms
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -366,6 +366,154 @@ def get_dry_run_commands(
             "output": str(mkv_path),
             "command": cmd_parts,
             "chapters_xml": chapter_xml,
+        })
+
+    return result
+
+
+# ── Special features export ──────────────────────────────────────────
+
+
+def _specials_filename(sf: SpecialFeature, pattern: str) -> str:
+    """Generate output filename for a special feature."""
+    return pattern.format(
+        idx=sf.index,
+        category=sf.category,
+    )
+
+
+def _build_specials_cmd(
+    sf: SpecialFeature,
+    mkv_path: Path,
+    stream: Path,
+    pl: Playlist,
+    clip_pts_base: dict[str, float],
+    mkvmerge: str,
+) -> list[str]:
+    """Build the mkvmerge command for one special feature."""
+    m2ts = stream / f"{pl.play_items[0].clip_id}.m2ts"
+    cmd: list[str] = [mkvmerge, "-o", str(mkv_path)]
+
+    # Chapter-split: use --split parts: for sub-range of playlist
+    if sf.chapter_start is not None and pl.chapters and len(pl.chapters) > 1:
+        ch_times = [ticks_to_ms(ch.timestamp) for ch in pl.chapters]
+        clip_id = pl.play_items[0].clip_id
+        base_ms = clip_pts_base.get(clip_id, 0.0)
+
+        if sf.chapter_start < len(ch_times):
+            start_ms = ch_times[sf.chapter_start] - base_ms
+            end_ms = start_ms + sf.duration_ms
+            cmd.extend(["--split", f"parts:{_fmt_time(start_ms)}-{_fmt_time(end_ms)}"])
+
+    cmd.extend(["--title", f"{sf.category} {sf.index}"])
+    cmd.append(str(m2ts))
+    return cmd
+
+
+def export_specials_mkv(
+    analysis: DiscAnalysis,
+    out_dir: str | Path,
+    stream_dir: str | Path | None = None,
+    mkvmerge_path: str | None = None,
+    on_progress: "Callable[[int, int, str], None] | None" = None,
+    pattern: str = "Special_{idx:02d}_{category}.mkv",
+) -> list[Path]:
+    """Generate one MKV per special feature.
+
+    Returns list of created MKV paths.
+    """
+    if not analysis.special_features:
+        return []
+
+    out = Path(out_dir).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+
+    if stream_dir is None:
+        stream = Path(analysis.path).resolve() / "STREAM"
+    else:
+        stream = Path(stream_dir).resolve()
+
+    mkvmerge = mkvmerge_path or _find_mkvmerge()
+    if mkvmerge is None:
+        raise RuntimeError(
+            "mkvmerge not found. Install MKVToolNix or pass --mkvmerge-path."
+        )
+
+    # Build clip PTS base map
+    clip_pts_base: dict[str, float] = {}
+    for pl in analysis.playlists:
+        for pi in pl.play_items:
+            ms = ticks_to_ms(pi.in_time)
+            if pi.clip_id not in clip_pts_base or ms < clip_pts_base[pi.clip_id]:
+                clip_pts_base[pi.clip_id] = ms
+
+    pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
+    created: list[Path] = []
+    total = len(analysis.special_features)
+
+    for sf in analysis.special_features:
+        pl = pl_by_name.get(sf.playlist)
+        if pl is None:
+            continue
+
+        mkv_name = _specials_filename(sf, pattern)
+        mkv_path = out / mkv_name
+
+        if on_progress is not None:
+            on_progress(sf.index, total, mkv_name)
+
+        cmd = _build_specials_cmd(sf, mkv_path, stream, pl, clip_pts_base, mkvmerge)
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode > 1:
+            raise RuntimeError(
+                f"mkvmerge failed for special {sf.index}:\n{result.stderr}"
+            )
+        created.append(mkv_path)
+
+    return created
+
+
+def get_specials_dry_run(
+    analysis: DiscAnalysis,
+    out_dir: str | Path,
+    stream_dir: str | Path | None = None,
+    pattern: str = "Special_{idx:02d}_{category}.mkv",
+) -> list[dict]:
+    """Return the mkvmerge commands for special features without executing."""
+    if not analysis.special_features:
+        return []
+
+    out = Path(out_dir).resolve()
+    if stream_dir is None:
+        stream = Path(analysis.path).resolve() / "STREAM"
+    else:
+        stream = Path(stream_dir).resolve()
+
+    clip_pts_base: dict[str, float] = {}
+    for pl in analysis.playlists:
+        for pi in pl.play_items:
+            ms = ticks_to_ms(pi.in_time)
+            if pi.clip_id not in clip_pts_base or ms < clip_pts_base[pi.clip_id]:
+                clip_pts_base[pi.clip_id] = ms
+
+    pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
+    result = []
+
+    for sf in analysis.special_features:
+        pl = pl_by_name.get(sf.playlist)
+        if pl is None:
+            continue
+
+        mkv_name = _specials_filename(sf, pattern)
+        mkv_path = out / mkv_name
+        cmd = _build_specials_cmd(sf, mkv_path, stream, pl, clip_pts_base, "mkvmerge")
+
+        result.append({
+            "index": sf.index,
+            "category": sf.category,
+            "output": str(mkv_path),
+            "command": cmd,
         })
 
     return result
