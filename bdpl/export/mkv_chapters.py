@@ -164,7 +164,7 @@ def export_chapter_mkv(
     mkvmerge_path: str | None = None,
     dry_run: bool = False,
     on_progress: "Callable[[int, int, str], None] | None" = None,
-    pattern: str = "{name} - S01E{ep:02d}.mkv",
+    pattern: str = "Episode_{ep:02d}.mkv",
 ) -> list[Path]:
     """Generate one lightweight MKV per episode with chapters and track names.
 
@@ -206,13 +206,12 @@ def export_chapter_mkv(
             if pi.clip_id not in clip_streams and pi.streams:
                 clip_streams[pi.clip_id] = pi.streams
 
-    name = _disc_name(analysis)
     created: list[Path] = []
     commands: list[list[str]] = []
     total = len(analysis.episodes)
 
     for ep_idx, ep in enumerate(analysis.episodes):
-        mkv_name = pattern.format(ep=ep.episode, name=name)
+        mkv_name = pattern.format(ep=ep.episode)
         mkv_path = out / mkv_name
 
         if on_progress is not None:
@@ -311,7 +310,7 @@ def get_dry_run_commands(
     analysis: DiscAnalysis,
     out_dir: str | Path,
     stream_dir: str | Path | None = None,
-    pattern: str = "{name} - S01E{ep:02d}.mkv",
+    pattern: str = "Episode_{ep:02d}.mkv",
 ) -> list[dict]:
     """Return the mkvmerge commands that would be run, without executing.
 
@@ -331,12 +330,11 @@ def get_dry_run_commands(
             if pi.clip_id not in clip_pts_base or ms < clip_pts_base[pi.clip_id]:
                 clip_pts_base[pi.clip_id] = ms
 
-    name = _disc_name(analysis)
     result = []
     for ep_idx, ep in enumerate(analysis.episodes):
         chapters = _chapters_for_episode(analysis, ep_idx)
         chapter_xml = _build_chapter_xml(chapters)
-        mkv_path = out / pattern.format(ep=ep.episode, name=name)
+        mkv_path = out / pattern.format(ep=ep.episode)
 
         m2ts_files = [stream / f"{seg.clip_id}.m2ts" for seg in ep.segments]
 
@@ -376,22 +374,11 @@ def get_dry_run_commands(
 # ── Special features export ──────────────────────────────────────────
 
 
-def _disc_name(analysis: DiscAnalysis) -> str:
-    """Derive a disc name from the BDMV parent folder."""
-    bdmv = Path(analysis.path).resolve()
-    # BDMV/ is typically inside a disc folder like UCG_0080_D1/BDMV
-    parent = bdmv.parent
-    if parent.name and parent.name != bdmv.anchor:
-        return parent.name
-    return bdmv.name
-
-
-def _specials_filename(sf: SpecialFeature, pattern: str, name: str = "") -> str:
+def _specials_filename(sf: SpecialFeature, pattern: str) -> str:
     """Generate output filename for a special feature."""
     return pattern.format(
         idx=sf.index,
         category=sf.category,
-        name=name,
     )
 
 
@@ -429,7 +416,7 @@ def export_specials_mkv(
     stream_dir: str | Path | None = None,
     mkvmerge_path: str | None = None,
     on_progress: "Callable[[int, int, str], None] | None" = None,
-    pattern: str = "{name} - S00E{idx:02d} - {category}.mkv",
+    pattern: str = "Special_{idx:02d}_{category}.mkv",
 ) -> list[Path]:
     """Generate one MKV per special feature.
 
@@ -460,7 +447,6 @@ def export_specials_mkv(
             if pi.clip_id not in clip_pts_base or ms < clip_pts_base[pi.clip_id]:
                 clip_pts_base[pi.clip_id] = ms
 
-    name = _disc_name(analysis)
     pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
     created: list[Path] = []
     total = len(analysis.special_features)
@@ -470,7 +456,7 @@ def export_specials_mkv(
         if pl is None:
             continue
 
-        mkv_name = _specials_filename(sf, pattern, name)
+        mkv_name = _specials_filename(sf, pattern)
         mkv_path = out / mkv_name
 
         if on_progress is not None:
@@ -492,7 +478,7 @@ def get_specials_dry_run(
     analysis: DiscAnalysis,
     out_dir: str | Path,
     stream_dir: str | Path | None = None,
-    pattern: str = "{name} - S00E{idx:02d} - {category}.mkv",
+    pattern: str = "Special_{idx:02d}_{category}.mkv",
 ) -> list[dict]:
     """Return the mkvmerge commands for special features without executing."""
     if not analysis.special_features:
@@ -511,7 +497,6 @@ def get_specials_dry_run(
             if pi.clip_id not in clip_pts_base or ms < clip_pts_base[pi.clip_id]:
                 clip_pts_base[pi.clip_id] = ms
 
-    name = _disc_name(analysis)
     pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
     result = []
 
@@ -520,7 +505,7 @@ def get_specials_dry_run(
         if pl is None:
             continue
 
-        mkv_name = _specials_filename(sf, pattern, name)
+        mkv_name = _specials_filename(sf, pattern)
         mkv_path = out / mkv_name
         cmd = _build_specials_cmd(sf, mkv_path, stream, pl, clip_pts_base, "mkvmerge")
 
