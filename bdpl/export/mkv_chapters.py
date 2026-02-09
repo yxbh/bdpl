@@ -70,36 +70,54 @@ def _chapters_for_episode(
         # Fallback: single chapter at 0
         return [(0.0, f"Episode {ep.episode}")]
 
-    # Build a set of clip_ids for this episode's segments
-    ep_clip_ids = [seg.clip_id for seg in ep.segments]
+    # Determine if this is a chapter-split episode (sub-range of a play item)
+    # by checking if the episode is significantly shorter than its play item
+    is_chapter_split = False
+    if len(ep.segments) == 1:
+        seg = ep.segments[0]
+        for pi in pl.play_items:
+            if pi.clip_id == seg.clip_id:
+                if ep.duration_ms < pi.duration_ms * 0.95:
+                    is_chapter_split = True
+                break
 
-    # Map play-item index → clip_id for matching chapters
-    pi_clip_map = {i: pi.clip_id for i, pi in enumerate(pl.play_items)}
-
-    # Accumulate offset as we walk through episode segments in order.
-    # For each segment, find chapter marks that belong to its play item.
-    seg_offset_ms = 0.0
-    for seg in ep.segments:
-        # Find the play-item index(es) for this segment's clip_id
-        for pi_idx, pi in enumerate(pl.play_items):
-            if pi.clip_id != seg.clip_id:
-                continue
-            # Check time overlap (same clip can appear multiple times)
-            pi_in_ms = ticks_to_ms(pi.in_time)
-            if abs(pi_in_ms - seg.in_ms) > 1000:
-                continue
-            # Matched — pull chapters for this play item
-            for ch in pl.chapters:
-                if ch.play_item_ref != pi_idx:
-                    continue
-                ch_ms = ticks_to_ms(ch.timestamp)
-                rel_ms = seg_offset_ms + (ch_ms - pi_in_ms)
-                if rel_ms < -500:
-                    continue
-                rel_ms = max(0.0, rel_ms)
+    if is_chapter_split:
+        # Chapter-split: filter MPLS chapters that fall within this
+        # episode's time range (using absolute PTS timestamps)
+        seg = ep.segments[0]
+        for ch in pl.chapters:
+            ch_ms = ticks_to_ms(ch.timestamp)
+            if ch_ms >= seg.in_ms - 100 and ch_ms < seg.out_ms - 100:
+                rel_ms = max(0.0, ch_ms - seg.in_ms)
                 chapters.append((rel_ms, f"Chapter {len(chapters) + 1}"))
-            break
-        seg_offset_ms += seg.duration_ms
+    else:
+        # Standard path: match chapters to play items by index
+        # Build a set of clip_ids for this episode's segments
+        ep_clip_ids = [seg.clip_id for seg in ep.segments]
+
+        # Map play-item index → clip_id for matching chapters
+        pi_clip_map = {i: pi.clip_id for i, pi in enumerate(pl.play_items)}
+
+        # Accumulate offset as we walk through episode segments in order.
+        seg_offset_ms = 0.0
+        for seg in ep.segments:
+            for pi_idx, pi in enumerate(pl.play_items):
+                if pi.clip_id != seg.clip_id:
+                    continue
+                pi_in_ms = ticks_to_ms(pi.in_time)
+                if abs(pi_in_ms - seg.in_ms) > 1000:
+                    continue
+                for ch in pl.chapters:
+                    if ch.play_item_ref != pi_idx:
+                        continue
+                    ch_ms = ticks_to_ms(ch.timestamp)
+                    rel_ms = seg_offset_ms + (ch_ms - pi_in_ms)
+                    if rel_ms < -500:
+                        continue
+                    rel_ms = max(0.0, rel_ms)
+                    chapters.append((rel_ms, f"Chapter {len(chapters) + 1}"))
+                break
+            seg_offset_ms += seg.duration_ms
 
     if not chapters:
         chapters.append((0.0, f"Episode {ep.episode}"))
@@ -207,8 +225,29 @@ def export_chapter_mkv(
         # Collect m2ts source files for this episode
         m2ts_files = [stream / f"{seg.clip_id}.m2ts" for seg in ep.segments]
 
+        # Determine if we need time-based splitting (chapter-based episodes
+        # reference a sub-range of a large m2ts file)
+        needs_split = (
+            len(ep.segments) == 1
+            and ep.segments[0].clip_id in clip_pts_base
+            and ep.duration_ms < 0.95 * sum(
+                pi.duration_ms for pl in analysis.playlists
+                for pi in pl.play_items if pi.clip_id == ep.segments[0].clip_id
+            )
+        )
+
         # Build mkvmerge command
         cmd: list[str] = [mkvmerge or "mkvmerge", "-o", str(mkv_path)]
+
+        # If episode is a sub-range of a single m2ts, use --split parts:
+        if needs_split:
+            seg = ep.segments[0]
+            base_ms = clip_pts_base[seg.clip_id]
+            start_ms = seg.in_ms - base_ms
+            end_ms = seg.out_ms - base_ms
+            start_ts = _fmt_time(start_ms)
+            end_ts = _fmt_time(end_ms)
+            cmd.extend(["--split", f"parts:{start_ts}-{end_ts}"])
 
         # Add chapters
         cmd.extend(["--chapters", str(chapter_file)])
@@ -283,6 +322,14 @@ def get_dry_run_commands(
     else:
         stream = Path(stream_dir).resolve()
 
+    # Build clip PTS base map for split calculations
+    clip_pts_base: dict[str, float] = {}
+    for pl in analysis.playlists:
+        for pi in pl.play_items:
+            ms = ticks_to_ms(pi.in_time)
+            if pi.clip_id not in clip_pts_base or ms < clip_pts_base[pi.clip_id]:
+                clip_pts_base[pi.clip_id] = ms
+
     result = []
     for ep_idx, ep in enumerate(analysis.episodes):
         chapters = _chapters_for_episode(analysis, ep_idx)
@@ -291,7 +338,23 @@ def get_dry_run_commands(
 
         m2ts_files = [stream / f"{seg.clip_id}.m2ts" for seg in ep.segments]
 
+        # Check if this episode needs time-based splitting
+        needs_split = (
+            len(ep.segments) == 1
+            and ep.segments[0].clip_id in clip_pts_base
+            and ep.duration_ms < 0.95 * sum(
+                pi.duration_ms for pl in analysis.playlists
+                for pi in pl.play_items if pi.clip_id == ep.segments[0].clip_id
+            )
+        )
+
         cmd_parts = ["mkvmerge", "-o", str(mkv_path)]
+        if needs_split:
+            seg = ep.segments[0]
+            base_ms = clip_pts_base[seg.clip_id]
+            start_ts = _fmt_time(seg.in_ms - base_ms)
+            end_ts = _fmt_time(seg.out_ms - base_ms)
+            cmd_parts.extend(["--split", f"parts:{start_ts}-{end_ts}"])
         cmd_parts.extend(["--title", f"Episode {ep.episode}"])
         for i, m2ts in enumerate(m2ts_files):
             if i > 0:
