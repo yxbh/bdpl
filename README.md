@@ -12,6 +12,8 @@ Requires Python 3.10+.
 pip install -e .
 ```
 
+For remuxing, you also need [MKVToolNix](https://mkvtoolnix.download/) (`mkvmerge` on PATH).
+
 ## Quick Start
 
 Point `bdpl` at a `BDMV/` directory from a disc backup:
@@ -25,6 +27,9 @@ bdpl explain /path/to/BDMV
 
 # Generate debug playlists for previewing in a media player
 bdpl playlist /path/to/BDMV --out ./Playlists
+
+# Remux episodes to MKV with chapters and named tracks
+bdpl remux /path/to/BDMV --out ./Episodes
 ```
 
 ### Example: `bdpl explain`
@@ -47,24 +52,29 @@ Playlists
   00002.mpls         01:21:06      4  play_all
   00003.mpls            01:06      1  creditless_op
   00004.mpls            01:43      1  creditless_ed
-  00005.mpls            02:00      1  creditless_ed
-  00006.mpls            02:00      1  creditless_ed
-  00007.mpls            11:23      1  extra
-  00008.mpls            01:38      1  creditless_ed
-  00009.mpls            00:16      1  extra
-  00010.mpls            00:17      1  extra
+  ...
 
 ------------------------------------------------------------
 Episodes
 ------------------------------------------------------------
-  Ep  1       26:15  conf=0.70  clips=[00007]
-  Ep  2       27:16  conf=0.70  clips=[00008]
-  Ep  3       27:22  conf=0.70  clips=[00009]
+  Ep  1       26:15  conf=0.80  clips=[00007]
+  Ep  2       27:16  conf=0.80  clips=[00008]
+  Ep  3       27:22  conf=0.80  clips=[00009]
 
 ------------------------------------------------------------
 Warnings
 ------------------------------------------------------------
   [PLAY_ALL_ONLY] Episodes were inferred by decomposing Play All playlist
+
+------------------------------------------------------------
+Disc Hints
+------------------------------------------------------------
+  index.bdmv:       9 title(s)
+  MovieObject.bdmv: 11 object(s), 11 with playlist refs
+    Title 0 -> 00002.mpls
+    Title 1 -> 00003.mpls
+    ...
+  IG menu:          59 button action(s), chapter marks=[0, 1, 6, 11]
 ```
 
 ## Commands
@@ -114,22 +124,35 @@ bdpl remux /path/to/BDMV --dry-run
 
 ## How It Works
 
-bdpl reads the raw BDMV binary structures — no external tools needed:
+bdpl reads the raw BDMV binary structures — no external tools needed for analysis:
 
 1. **Parse** `PLAYLIST/*.mpls` files to extract play items (clip references with in/out timestamps), chapters, and stream tables
 2. **Parse** `CLIPINF/*.clpi` files for stream metadata (codecs, languages)
-3. **Analyze** the playlist graph:
+3. **Parse disc hints** from `index.bdmv` (title→playlist mapping), `MovieObject.bdmv` (navigation commands), and IG menu streams (button→chapter mappings)
+4. **Analyze** the playlist graph:
    - Compute segment signatures and deduplicate near-identical playlists
    - Cluster playlists by duration to find episode-length candidates
    - Detect "Play All" playlists (concatenations of other playlists)
    - Label shared segments as OP, ED, BODY, PREVIEW, LEGAL
-4. **Infer** episode order from clip IDs or Play All decomposition
-5. **Export** results as JSON, text reports, or M3U playlists
+5. **Infer** episode order using multiple strategies (see below)
+6. **Boost confidence** when navigation hints and IG menu data confirm episode boundaries
+7. **Export** results as JSON, text reports, or M3U playlists
 
 ### Episode Inference Strategies
 
 - **Individual episode playlists**: Each episode has its own MPLS with a unique "body" segment, plus shared OP/ED. Episodes are ordered by body clip ID.
 - **Play All decomposition**: Some discs (common in anime) only have a single "Play All" playlist. bdpl decomposes it — each long play item (>10 min) becomes an episode.
+- **Chapter-based splitting**: When a disc has a single long m2ts with multiple chapters but no separate playlists, bdpl splits into episodes using chapter boundaries and target duration heuristics.
+
+### Confidence Scoring
+
+Each detected episode gets a confidence score (0–1) based on how it was identified:
+
+| Source | Base | Possible boosts |
+|--------|------|-----------------|
+| Individual playlists | 0.9 | +0.1 title hint |
+| Play All decomposition | 0.7 | +0.1 title hint |
+| Chapter splitting | 0.6 | +0.1 title hint, +0.1 IG chapter marks |
 
 ## JSON Schema
 
@@ -186,19 +209,24 @@ bdpl/
       reader.py          # Big-endian binary reader
       mpls.py            # MPLS playlist parser
       clpi.py            # CLPI clip info parser
+      index_bdmv.py      # index.bdmv title mapping parser
+      movieobject_bdmv.py # MovieObject.bdmv navigation command parser
+      ig_stream.py       # [Experimental] IG menu stream parser
     analyze/
       __init__.py        # scan_disc() pipeline
       signatures.py      # Deduplication
       clustering.py      # Duration clustering
       segment_graph.py   # Segment reuse & Play All detection
       classify.py        # Segment & playlist labeling
-      ordering.py        # Episode ordering
+      ordering.py        # Episode ordering (individual, Play All, chapter split)
       explain.py         # Human-readable reports
     export/
       json_out.py        # JSON output
       text_report.py     # Text reports
       m3u.py             # M3U playlists
+      mkv_chapters.py    # MKV remux with chapters (via mkvmerge)
   tests/
+    fixtures/            # Bundled BDMV metadata for portable tests
   pyproject.toml
 ```
 
