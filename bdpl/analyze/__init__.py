@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from bdpl.model import ClipInfo, DiscAnalysis, Playlist, Warning, ticks_to_ms
+from bdpl.model import ClipInfo, DiscAnalysis, Playlist, SpecialFeature, Warning, ticks_to_ms
 
 from bdpl.analyze.signatures import compute_signatures, find_duplicates
 from bdpl.analyze.clustering import cluster_by_duration, pick_representative
@@ -144,6 +144,139 @@ def _parse_ig_hints(
             )),
             "has_direct_play": any(h.playlist is not None for h in all_ig_hints),
         }
+        hints["ig_hints_raw"] = all_ig_hints
+
+
+def _detect_special_features(
+    hints: dict,
+    classifications: dict[str, str],
+    playlists: list[Playlist],
+    episodes: list,
+) -> list[SpecialFeature]:
+    """Detect special features using IG menu JumpTitle buttons + title hints.
+
+    Looks for IG buttons that JumpTitle to non-episode playlists. When a button
+    also sets reg2 (chapter index), it indicates multiple features within one
+    playlist — each gets its own SpecialFeature entry.
+    """
+    ig_hints_raw = hints.get("ig_hints_raw", [])
+    title_pl = hints.get("title_playlists", {})
+
+    if not ig_hints_raw or not title_pl:
+        # Fall back to classification-only detection (no IG data)
+        return _special_features_from_classifications(
+            classifications, playlists, episodes,
+        )
+
+    # Build set of episode playlists to exclude
+    ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
+    # Also exclude play_all playlists
+    play_all_set = set()
+    for mpls, cat in classifications.items():
+        if cat == "play_all":
+            play_all_set.add(mpls)
+
+    # Build title → playlist name mapping (0-based title index)
+    title_to_mpls: dict[int, str] = {}
+    for title_num, pl_nums in title_pl.items():
+        if pl_nums:
+            title_to_mpls[title_num] = f"{pl_nums[0]:05d}.mpls"
+
+    # Build playlist lookup
+    pl_by_name = {pl.mpls: pl for pl in playlists}
+
+    # Find IG buttons with JumpTitle to non-episode titles.
+    # JumpTitle operand is 1-based; index titles are 0-based.
+    seen: set[tuple[str, int | None]] = set()
+    features: list[SpecialFeature] = []
+    idx = 1
+
+    # Sort by page then button_id for stable menu-order output
+    sorted_hints = sorted(ig_hints_raw, key=lambda h: (h.page_id, h.button_id))
+
+    for h in sorted_hints:
+        if h.jump_title is None:
+            continue
+        # Convert 1-based JumpTitle to 0-based index title
+        title_idx = h.jump_title - 1
+        mpls = title_to_mpls.get(title_idx)
+        if mpls is None:
+            continue
+        if mpls in ep_playlists or mpls in play_all_set:
+            continue
+
+        ch_start = h.register_sets.get(2)
+        key = (mpls, ch_start)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        pl = pl_by_name.get(mpls)
+        if pl is None:
+            continue
+
+        category = classifications.get(mpls, "extra")
+
+        # Calculate duration for chapter-split features
+        dur_ms = pl.duration_ms
+        if ch_start is not None and pl.chapters and len(pl.chapters) > 1:
+            ch_times = [ticks_to_ms(ch.timestamp) for ch in pl.chapters]
+            end_ms = ticks_to_ms(pl.play_items[-1].out_time)
+            if ch_start < len(ch_times):
+                start_ms = ch_times[ch_start]
+                # Find next chapter-start for this same playlist
+                next_start = None
+                for h2 in sorted_hints:
+                    if h2.jump_title != h.jump_title:
+                        continue
+                    r2 = h2.register_sets.get(2)
+                    if r2 is not None and r2 > ch_start and r2 < len(ch_times):
+                        if next_start is None or ch_times[r2] < next_start:
+                            next_start = ch_times[r2]
+                if next_start is not None:
+                    dur_ms = next_start - start_ms
+                else:
+                    dur_ms = end_ms - start_ms
+
+        features.append(SpecialFeature(
+            index=idx,
+            playlist=mpls,
+            duration_ms=dur_ms,
+            category=category,
+            chapter_start=ch_start,
+        ))
+        idx += 1
+
+    return features
+
+
+def _special_features_from_classifications(
+    classifications: dict[str, str],
+    playlists: list[Playlist],
+    episodes: list,
+) -> list[SpecialFeature]:
+    """Fallback: build special features list from playlist classifications."""
+    ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
+    pl_by_name = {pl.mpls: pl for pl in playlists}
+    features: list[SpecialFeature] = []
+    idx = 1
+
+    non_episode_cats = {"creditless_op", "creditless_ed", "extra"}
+    for mpls, cat in sorted(classifications.items()):
+        if cat not in non_episode_cats or mpls in ep_playlists:
+            continue
+        pl = pl_by_name.get(mpls)
+        if pl is None:
+            continue
+        features.append(SpecialFeature(
+            index=idx,
+            playlist=mpls,
+            duration_ms=pl.duration_ms,
+            category=cat,
+        ))
+        idx += 1
+
+    return features
 
 
 def scan_disc(
@@ -289,11 +422,17 @@ def scan_disc(
             )
         )
 
+    # 8. Detect special features from IG menu + title hints
+    special_features = _detect_special_features(
+        hints, classifications, playlists, episodes,
+    )
+
     return DiscAnalysis(
         path=str(bdmv_path),
         playlists=playlists,
         clips=clips,
         episodes=episodes,
         warnings=warnings,
+        special_features=special_features,
         analysis=analysis,
     )

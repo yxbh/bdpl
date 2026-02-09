@@ -76,6 +76,18 @@ def analysis_to_dict(analysis: DiscAnalysis) -> dict:
             "context": w.context,
         })
 
+    special_features = []
+    for sf in analysis.special_features:
+        entry: dict = {
+            "index": sf.index,
+            "playlist": sf.playlist,
+            "duration_ms": sf.duration_ms,
+            "category": sf.category,
+        }
+        if sf.chapter_start is not None:
+            entry["chapter_start"] = sf.chapter_start
+        special_features.append(entry)
+
     return {
         "schema_version": "bdpl.disc.v1",
         "disc": {
@@ -84,6 +96,7 @@ def analysis_to_dict(analysis: DiscAnalysis) -> dict:
         },
         "playlists": playlists,
         "episodes": episodes,
+        "special_features": special_features,
         "warnings": warnings,
         "analysis": analysis.analysis,
     }

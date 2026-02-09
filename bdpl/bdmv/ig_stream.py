@@ -73,6 +73,7 @@ class IGMenuHint:
     button_id: int
     playlist: int | None = None
     mark: int | None = None
+    jump_title: int | None = None
     register_sets: dict[int, int] = field(default_factory=dict)
 
 
@@ -270,8 +271,8 @@ def parse_ics(data: bytes) -> InteractiveComposition:
 def extract_menu_hints(ics: InteractiveComposition) -> list[IGMenuHint]:
     """Extract actionable hints from parsed IG menu buttons.
 
-    Returns hints for buttons that directly play a playlist or set GPR
-    registers (often used for episode / chapter selection).
+    Returns hints for buttons that directly play a playlist, jump to a
+    title, or set GPR registers (often used for episode / chapter selection).
     """
     hints: list[IGMenuHint] = []
 
@@ -288,6 +289,9 @@ def extract_menu_hints(ics: InteractiveComposition) -> list[IGMenuHint]:
                     hint.playlist = cmd.operand1
                     if cmd.op_code == 2:  # PlayPL_PM
                         hint.mark = cmd.operand2
+                    has_action = True
+                elif cmd.is_jump_title:
+                    hint.jump_title = cmd.operand1
                     has_action = True
                 elif cmd.group == 2 and cmd.sub_group == 0:
                     # SET / MOV: reg = value

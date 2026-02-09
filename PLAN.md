@@ -64,12 +64,16 @@ Produce one MKV per episode using an external muxer (default: `mkvmerge`).
 bdpl remux /path/to/BDMV --episodes disc.json --out ./Episodes
 bdpl remux /path/to/BDMV --out ./Episodes --pattern "S01E{ep:02d}.mkv"
 bdpl remux /path/to/BDMV --dry-run
+bdpl remux /path/to/BDMV --specials              # include special features
+bdpl remux /path/to/BDMV --specials --specials-pattern "Extra_{idx:02d}_{category}.mkv"
 ```
 
 Behavior:
 - Uses episode mapping from `disc.json` (or runs scan internally if not provided)
 - Generates and executes mux commands
 - Copies/creates chapters when possible
+- `--specials` flag also remuxes detected special features (creditless OP/ED, extras, previews)
+- Chapter-split specials use `--split parts:` for sub-range extraction
 - Allows track preference selection (language, commentary, signs/songs subs)
 
 #### `bdpl playlist` (debug)
@@ -425,25 +429,25 @@ Use `rich` tables optionally for readability.
 Updated 2026-02-09. v0.1 + v0.2 complete. v0.3 mostly complete. v0.4 mostly complete. 62 tests passing.
 
 Files implemented:
-- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux`)
-- `bdpl/model.py` — Dataclasses (Playlist, PlayItem, Episode, DiscAnalysis, etc.)
+- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` with `--specials`)
+- `bdpl/model.py` — Dataclasses (Playlist, PlayItem, Episode, SpecialFeature, DiscAnalysis, etc.)
 - `bdpl/bdmv/reader.py` — Big-endian BinaryReader with zero-copy slicing
 - `bdpl/bdmv/mpls.py` — MPLS parser (play items, chapters, STN streams)
 - `bdpl/bdmv/clpi.py` — CLPI parser (stream PIDs, codecs, languages)
 - `bdpl/bdmv/index_bdmv.py` — index.bdmv parser (title→movie object mapping)
 - `bdpl/bdmv/movieobject_bdmv.py` — MovieObject.bdmv parser (navigation commands, playlist refs)
 - `bdpl/bdmv/ig_stream.py` — [Experimental] IG menu stream parser (ICS demux, button nav commands)
-- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator + disc hint integration + IG hint integration
+- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator + disc hints + IG hints + special feature detection
 - `bdpl/analyze/signatures.py` — Signature computation + duplicate finding
 - `bdpl/analyze/clustering.py` — Duration-based clustering + representative picking
 - `bdpl/analyze/segment_graph.py` — Segment frequency + Play All detection
 - `bdpl/analyze/classify.py` — Segment labeling (OP/ED/BODY) + playlist classification
 - `bdpl/analyze/ordering.py` — Episode ordering (individual + Play All + chapter-based splitting)
 - `bdpl/analyze/explain.py` — Human-readable explanation generator
-- `bdpl/export/json_out.py` — JSON export (`bdpl.disc.v1` schema)
-- `bdpl/export/text_report.py` — Plain text summary report with disc hints section
+- `bdpl/export/json_out.py` — JSON export (`bdpl.disc.v1` schema) with special features
+- `bdpl/export/text_report.py` — Plain text summary report with disc hints + special features section
 - `bdpl/export/m3u.py` — M3U debug playlist generation
-- `bdpl/export/mkv_chapters.py` — MKV remux with chapters + track names + `--split parts:` for chapter splits
+- `bdpl/export/mkv_chapters.py` — MKV remux with chapters + track names + `--split parts:` for chapter splits + `--specials` for special features
 - `tests/` — 62 tests (reader, mpls, clpi, index, movieobject, ig_stream, chapter_split, scan, CLI)
 - `tests/fixtures/disc1/` — Bundled MPLS/CLPI/index/MovieObject from multi-episode disc
 - `tests/fixtures/disc2/` — Bundled metadata + ICS fixture from single-m2ts chapter-split disc
