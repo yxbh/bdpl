@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from bdpl.model import ClipInfo, DiscAnalysis, Playlist, Warning
+from bdpl.model import ClipInfo, DiscAnalysis, Playlist, Warning, ticks_to_ms
 
 from bdpl.analyze.signatures import compute_signatures, find_duplicates
 from bdpl.analyze.clustering import cluster_by_duration, pick_representative
@@ -238,6 +238,33 @@ def scan_disc(
                 continue
             if pl_num in hint_playlist_nums:
                 ep.confidence = min(1.0, ep.confidence + 0.1)
+
+    # 6c. Boost confidence when IG chapter marks confirm episode boundaries
+    ig_menu = hints.get("ig_menu", {})
+    ig_marks = ig_menu.get("chapter_marks")
+    if ig_marks and episodes and len(ig_marks) >= 2:
+        # Build list of chapter-start indices for each episode
+        # (episode starts at the chapter whose timestamp matches ep.segments[0].in_ms)
+        ep_playlist = episodes[0].playlist
+        match_pl = next(
+            (p for p in unique_playlists if p.mpls == ep_playlist), None
+        )
+        if match_pl and match_pl.chapters:
+            ch_times = [ticks_to_ms(ch.timestamp) for ch in match_pl.chapters]
+            ep_start_indices: list[int] = []
+            for ep in episodes:
+                seg_in = ep.segments[0].in_ms
+                # Find the chapter index closest to this episode start
+                best_idx = min(
+                    range(len(ch_times)),
+                    key=lambda j: abs(ch_times[j] - seg_in),
+                )
+                if abs(ch_times[best_idx] - seg_in) < 500:  # within 500ms
+                    ep_start_indices.append(best_idx)
+
+            if sorted(ep_start_indices) == sorted(ig_marks[: len(ep_start_indices)]):
+                for ep in episodes:
+                    ep.confidence = min(1.0, ep.confidence + 0.1)
 
     if not episodes:
         warnings.append(
