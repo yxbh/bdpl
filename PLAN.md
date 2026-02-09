@@ -442,4 +442,4 @@ Files implemented:
 
 Remaining work:
 - v0.3: `--prefer-audio`/`--prefer-subs`, `remux_plan.json`, `remux/ffmpeg.py`
-- v0.4: `util/hashing.py`, synthetic test fixtures, `CONTRIBUTING.md`
+- v0.4: `util/hashing.py`, `CONTRIBUTING.md`

@@ -15,7 +15,9 @@ bdpl/
 │   ├── bdmv/
 │   │   ├── reader.py        # BinaryReader — big-endian binary parser
 │   │   ├── mpls.py          # MPLS (Movie PlayList) parser
-│   │   └── clpi.py          # CLPI (Clip Information) parser
+│   │   ├── clpi.py          # CLPI (Clip Information) parser
+│   │   ├── index_bdmv.py    # index.bdmv parser (title→movie object mapping)
+│   │   └── movieobject_bdmv.py # MovieObject.bdmv parser (navigation commands)
 │   ├── analyze/
 │   │   ├── __init__.py      # scan_disc() — main analysis pipeline
 │   │   ├── signatures.py    # Playlist signature computation & dedup
@@ -36,6 +38,8 @@ bdpl/
 │   ├── test_reader.py       # BinaryReader unit tests
 │   ├── test_mpls_parse.py   # MPLS parser tests (real BDMV data)
 │   ├── test_clpi_parse.py   # CLPI parser tests (real BDMV data)
+│   ├── test_index_bdmv.py   # index.bdmv parser tests
+│   ├── test_movieobject_bdmv.py # MovieObject.bdmv parser tests
 │   ├── test_scan.py         # Full scan pipeline integration tests
 │   └── test_cli.py          # CLI subprocess tests
 ├── pyproject.toml           # Build config, deps (typer, rich, pytest)
@@ -48,17 +52,21 @@ bdpl/
 ### Binary Formats
 - **MPLS** files (`BDMV/PLAYLIST/*.mpls`): Define playback order — which clips to play, in what order, with what in/out times. Start with magic `MPLS` + version string.
 - **CLPI** files (`BDMV/CLIPINF/*.clpi`): Clip metadata — stream types (video/audio/subtitle), codecs, languages. Start with magic `HDMV` + version string.
+- **index.bdmv**: Disc title table — maps title numbers to MovieObject IDs. Start with magic `INDX`.
+- **MovieObject.bdmv**: Navigation commands — bytecode that references playlists and titles. Start with magic `MOBJ`.
 - **M2TS** files (`BDMV/STREAM/*.m2ts`): The actual media transport streams.
 - All BDMV binary structures are **big-endian**. Timestamps are in **45 kHz ticks**.
 
 ### Analysis Pipeline (`scan_disc()`)
-1. Parse all MPLS and CLPI files
-2. Compute playlist signatures for deduplication
-3. Cluster by duration to find episode-length playlists
-4. Detect "Play All" playlists (supersets of other playlists)
-5. Label segments (LEGAL, OP, ED, BODY, PREVIEW)
-6. Classify playlists (episode, play_all, bumper, creditless_op, etc.)
-7. Infer episode order — either from individual playlists or by decomposing Play All
+1. Parse index.bdmv and MovieObject.bdmv for navigation hints (title→playlist mapping)
+2. Parse all MPLS and CLPI files
+3. Compute playlist signatures for deduplication
+4. Cluster by duration to find episode-length playlists
+5. Detect "Play All" playlists (supersets of other playlists)
+6. Label segments (LEGAL, OP, ED, BODY, PREVIEW)
+7. Classify playlists (episode, play_all, bumper, creditless_op, etc.)
+8. Infer episode order — either from individual playlists or by decomposing Play All
+9. Boost confidence when navigation hints confirm episode playlists
 
 ### Episode Inference Strategies
 - **Individual episodes**: When each episode has its own MPLS playlist
@@ -110,15 +118,16 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - Robust error handling — parsers should not crash on malformed data
 - All times in models: 45 kHz ticks (raw) or milliseconds (derived)
 
-## Current Status: v0.1 MVP
+## Current Status: v0.2+
 - ✅ MPLS parser (play items, chapters, streams)
 - ✅ CLPI parser (stream types, codecs, languages)
-- ✅ Full analysis pipeline (signatures, clustering, classification, ordering)
+- ✅ index.bdmv parser (title→movie object mapping)
+- ✅ MovieObject.bdmv parser (navigation commands, playlist references)
+- ✅ Full analysis pipeline with navigation hints integration
 - ✅ Episode inference (individual playlists + Play All decomposition)
 - ✅ JSON export, text reports, M3U playlists
-- ✅ CLI commands: `scan`, `explain`, `playlist`
-- 🔲 `remux` command (v0.3)
-- 🔲 `index.bdmv` / `MovieObject.bdmv` hints (v0.2)
+- ✅ MKV remux with chapters + track names (via mkvmerge)
+- ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`
 
 ## Agent Tips
 - When modifying parsers, test against real BDMV data (set `BDPL_TEST_BDMV` env var)
