@@ -140,8 +140,10 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - ✅ IG stream parser [experimental] (menu button commands, episode hints)
 - ✅ Full analysis pipeline with navigation hints + IG integration
 - ✅ Episode inference (individual playlists + Play All + chapter splitting)
+- ✅ Special feature detection from IG menu JumpTitle buttons
 - ✅ JSON export, text reports, M3U playlists
 - ✅ MKV remux with chapters + track names (via mkvmerge)
+- ✅ `--specials` remux flag for creditless OP/ED, extras, previews
 - ✅ Chapter-based episode splitting with mkvmerge `--split parts:`
 - ✅ Bundled test fixtures (62 tests, no env var needed)
 - ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`
@@ -149,6 +151,9 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 ## Agent Tips
 - When modifying parsers, test against real BDMV data (set `BDPL_TEST_BDMV` env var)
 - The analysis pipeline is in `analyze/__init__.py:scan_disc()` — this orchestrates everything
+- Special feature detection is in `_detect_special_features()` — uses IG JumpTitle buttons pointing to non-episode playlists
+- `JumpTitle(N)` in HDMV commands is **1-based** — convert to 0-based index title with `N - 1`
+- Chapter-split features: when a button sets `reg2` before `JumpTitle`, it selects a chapter within the target playlist (multi-feature playlists)
 - Playlist classifications are heuristic-based; new disc patterns may need new rules
 - Segment keys use quantization (default ±250ms) to handle tiny timing variances
 

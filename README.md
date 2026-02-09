@@ -62,6 +62,18 @@ Episodes
   Ep  3       27:22  conf=0.80  clips=[00009]
 
 ------------------------------------------------------------
+Special Features (9)
+------------------------------------------------------------
+   1. 00003.mpls       01:06  creditless_op
+   2. 00004.mpls       01:43  creditless_ed
+   3. 00005.mpls       02:00  creditless_ed
+   ...
+   6. 00008.mpls  ch.0       01:22  creditless_ed
+   7. 00008.mpls  ch.1       00:16  creditless_ed
+   8. 00009.mpls       00:16  extra
+   9. 00010.mpls       00:17  extra
+
+------------------------------------------------------------
 Warnings
 ------------------------------------------------------------
   [PLAY_ALL_ONLY] Episodes were inferred by decomposing Play All playlist
@@ -92,6 +104,7 @@ bdpl scan /path/to/BDMV --stdout --compact   # Machine-readable
 Output includes:
 - Full playlist inventory with durations, streams, and chapters
 - Episode candidates with confidence scores
+- Special features (creditless OP/ED, extras, previews) detected from IG menus
 - Playlist classifications (episode, play_all, bumper, creditless_op, etc.)
 - Warnings for ambiguous or low-confidence results
 
@@ -120,6 +133,10 @@ Remux episodes to MKV with chapters and named tracks. Requires `mkvmerge` (MKVTo
 bdpl remux /path/to/BDMV --out ./Episodes
 bdpl remux /path/to/BDMV --pattern "S01E{ep:02d}.mkv"
 bdpl remux /path/to/BDMV --dry-run
+
+# Also remux special features (creditless OP/ED, extras, previews)
+bdpl remux /path/to/BDMV --specials
+bdpl remux /path/to/BDMV --specials --specials-pattern "Extra_{idx:02d}_{category}.mkv"
 ```
 
 ## How It Works
@@ -136,7 +153,8 @@ bdpl reads the raw BDMV binary structures — no external tools needed for analy
    - Label shared segments as OP, ED, BODY, PREVIEW, LEGAL
 5. **Infer** episode order using multiple strategies (see below)
 6. **Boost confidence** when navigation hints and IG menu data confirm episode boundaries
-7. **Export** results as JSON, text reports, or M3U playlists
+7. **Detect special features** from IG menu `JumpTitle` buttons pointing to non-episode playlists (creditless OP/ED, extras, previews)
+8. **Export** results as JSON, text reports, M3U playlists, or MKV remux (including specials)
 
 ### Episode Inference Strategies
 
