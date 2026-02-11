@@ -42,9 +42,7 @@ class BinaryReader:
         """Set the read position relative to the slice start."""
         absolute = self._start + offset
         if absolute < self._start or absolute > self._end:
-            raise ValueError(
-                f"seek to offset {offset} out of range [0, {self._end - self._start}]"
-            )
+            raise ValueError(f"seek to offset {offset} out of range [0, {self._end - self._start}]")
         self._pos = absolute
 
     def skip(self, n: int) -> None:
@@ -63,8 +61,7 @@ class BinaryReader:
         """Raise if fewer than *n* bytes remain at the current position."""
         if self._end - self._pos < n:
             raise ValueError(
-                f"need {n} bytes at offset {self.tell()}, "
-                f"but only {self._end - self._pos} remain"
+                f"need {n} bytes at offset {self.tell()}, but only {self._end - self._pos} remain"
             )
 
     def require_at(self, offset: int, n: int) -> None:
@@ -72,8 +69,7 @@ class BinaryReader:
         absolute = self._start + offset
         if absolute < self._start or absolute + n > self._end:
             raise ValueError(
-                f"need {n} bytes at offset {offset}, "
-                f"but range is [0, {self._end - self._start}]"
+                f"need {n} bytes at offset {offset}, but range is [0, {self._end - self._start}]"
             )
 
     # -- slicing --
@@ -131,7 +127,4 @@ class BinaryReader:
 
     def __repr__(self) -> str:
         src = self._path or "bytes"
-        return (
-            f"BinaryReader({src}, pos={self.tell()}, "
-            f"remaining={self.remaining})"
-        )
+        return f"BinaryReader({src}, pos={self.tell()}, remaining={self.remaining})"

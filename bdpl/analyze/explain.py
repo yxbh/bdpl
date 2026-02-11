@@ -26,9 +26,7 @@ def explain_disc(analysis: DiscAnalysis) -> str:
     if classifications:
         lines.append("Playlist classification:")
         for mpls, cat in sorted(classifications.items()):
-            pl = next(
-                (p for p in analysis.playlists if p.mpls == mpls), None
-            )
+            pl = next((p for p in analysis.playlists if p.mpls == mpls), None)
             dur_str = _fmt_duration(pl.duration_ms) if pl else "?"
             lines.append(f"  {mpls}: {cat} ({dur_str})")
         lines.append("")
@@ -85,8 +83,7 @@ def explain_disc(analysis: DiscAnalysis) -> str:
         tp = hints.get("title_playlists", {})
         if tp:
             mappings = ", ".join(
-                f"T{t}->{','.join(f'{p:05d}.mpls' for p in pls)}"
-                for t, pls in sorted(tp.items())
+                f"T{t}->{','.join(f'{p:05d}.mpls' for p in pls)}" for t, pls in sorted(tp.items())
             )
             lines.append(f"  Title→playlist: {mappings}")
         ig = hints.get("ig_menu", {})

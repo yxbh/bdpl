@@ -1,4 +1,5 @@
 """M3U playlist generation for debugging."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -52,6 +53,7 @@ def export_m3u(
             except ValueError:
                 # Not a sub-path — use os.path.relpath for arbitrary trees
                 import os
+
                 rel = Path(os.path.relpath(m2ts, out))
             # VLC normalises m2ts PTS to start at 0, so subtract the
             # clip's base PTS to get a VLC-relative seek position.

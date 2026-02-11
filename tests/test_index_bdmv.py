@@ -1,5 +1,7 @@
 """Tests for index.bdmv parser."""
+
 import pytest
+
 from bdpl.bdmv.index_bdmv import parse_index_bdmv
 
 

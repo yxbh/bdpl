@@ -1,4 +1,5 @@
 """Text/rich report for terminal display."""
+
 from __future__ import annotations
 
 from bdpl.model import DiscAnalysis
@@ -43,8 +44,7 @@ def text_report(analysis: DiscAnalysis) -> str:
     for pl in analysis.playlists:
         cls = classifications.get(pl.mpls, "")
         lines.append(
-            f"  {pl.mpls:<16} {format_duration(pl.duration_ms):>10} "
-            f"{len(pl.play_items):>6}  {cls}"
+            f"  {pl.mpls:<16} {format_duration(pl.duration_ms):>10} {len(pl.play_items):>6}  {cls}"
         )
     lines.append("")
 

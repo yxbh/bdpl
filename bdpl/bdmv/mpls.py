@@ -106,12 +106,22 @@ def _parse_stn_table(r: BinaryReader) -> list[StreamInfo]:
     r.skip(5)  # reserved
 
     streams: list[StreamInfo] = []
-    total = num_video + num_audio + num_pg + num_ig + num_secondary_audio + num_secondary_video + num_pip_pg
+    total = (
+        num_video
+        + num_audio
+        + num_pg
+        + num_ig
+        + num_secondary_audio
+        + num_secondary_video
+        + num_pip_pg
+    )
     for _ in range(total):
         stream_type, pid = _parse_stream_entry(r)
         codec, lang, extra = _parse_stream_attrs(r)
         extra["stream_type"] = stream_type
-        streams.append(StreamInfo(pid=pid, stream_type=stream_type, codec=codec, lang=lang, extra=extra))
+        streams.append(
+            StreamInfo(pid=pid, stream_type=stream_type, codec=codec, lang=lang, extra=extra)
+        )
 
     r.seek(stn_start + stn_len)
     return streams
@@ -123,7 +133,7 @@ def _parse_play_item(r: BinaryReader) -> PlayItem:
     pi_start = r.tell()
 
     clip_name = r.read_string(5)
-    codec_id = r.read_string(4)
+    r.read_string(4)
 
     flags = r.u16()
     is_multi_angle = bool((flags >> 4) & 1)

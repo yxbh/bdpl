@@ -184,18 +184,22 @@ def parse_ics(data: bytes) -> InteractiveComposition:
 
     pages: list[IGPage] = []
     for _ in range(num_pages):
-        page_id = data[p]; p += 1
+        page_id = data[p]
+        p += 1
         p += 1  # page_version
         p += 8  # UO mask table
 
         # in_effects + out_effects
         for _ in range(2):
-            num_windows = data[p]; p += 1
+            num_windows = data[p]
+            p += 1
             p += num_windows * 9
-            num_effects = data[p]; p += 1
+            num_effects = data[p]
+            p += 1
             for _ in range(num_effects):
                 p += 4  # duration(24) + palette_id_ref(8)
-                num_co = data[p]; p += 1
+                num_co = data[p]
+                p += 1
                 for _ in range(num_co):
                     p += 2  # object_id
                     p += 1  # window_id
@@ -206,22 +210,30 @@ def parse_ics(data: bytes) -> InteractiveComposition:
                         p += 8
 
         p += 1  # animation_frame_rate_code
-        default_btn = struct.unpack_from(">H", data, p)[0]; p += 2
-        default_act = struct.unpack_from(">H", data, p)[0]; p += 2
+        default_btn = struct.unpack_from(">H", data, p)[0]
+        p += 2
+        default_act = struct.unpack_from(">H", data, p)[0]
+        p += 2
         p += 1  # palette_id_ref
-        num_bogs = data[p]; p += 1
+        num_bogs = data[p]
+        p += 1
 
         page_buttons: list[IGButton] = []
         for _ in range(num_bogs):
             p += 2  # bog_default_button
-            num_btns = data[p]; p += 1
+            num_btns = data[p]
+            p += 1
 
             for _ in range(num_btns):
-                btn_id = struct.unpack_from(">H", data, p)[0]; p += 2
+                btn_id = struct.unpack_from(">H", data, p)[0]
+                p += 2
                 p += 2  # numeric_select_value
-                auto_action = bool((data[p] >> 7) & 1); p += 1
-                btn_x = struct.unpack_from(">H", data, p)[0]; p += 2
-                btn_y = struct.unpack_from(">H", data, p)[0]; p += 2
+                auto_action = bool((data[p] >> 7) & 1)
+                p += 1
+                btn_x = struct.unpack_from(">H", data, p)[0]
+                p += 2
+                btn_y = struct.unpack_from(">H", data, p)[0]
+                p += 2
                 p += 8  # neighbor button IDs (up/down/left/right)
 
                 # normal state: start(16)+end(16)+repeat_flag+skip(7) = 5 bytes
@@ -231,7 +243,8 @@ def parse_ics(data: bytes) -> InteractiveComposition:
                 # activated state: sound(8)+start(16)+end(16) = 5 bytes
                 p += 5
 
-                num_cmds = struct.unpack_from(">H", data, p)[0]; p += 2
+                num_cmds = struct.unpack_from(">H", data, p)[0]
+                p += 2
                 commands: list[NavCommand] = []
                 for _ in range(num_cmds):
                     raw = data[p : p + 12]

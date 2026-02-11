@@ -10,9 +10,7 @@ def compute_signatures(playlists: list[Playlist]) -> dict[str, tuple]:
     return {pl.mpls: pl.signature_loose() for pl in playlists}
 
 
-def find_duplicates(
-    playlists: list[Playlist], quant_ms: float = 250
-) -> list[list[Playlist]]:
+def find_duplicates(playlists: list[Playlist], quant_ms: float = 250) -> list[list[Playlist]]:
     """Group playlists with identical loose signatures.
 
     Returns list of clusters where each cluster has 2+ playlists sharing
