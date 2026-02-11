@@ -37,13 +37,13 @@ class NavCommand:
     """A single HDMV navigation command (12 bytes)."""
 
     raw: bytes
-    group: int       # 0=branch, 1=compare, 2=set
+    group: int  # 0=branch, 1=compare, 2=set
     sub_group: int
     op_code: int
     imm_op1: bool
     imm_op2: bool
-    operand1: int    # 32-bit value
-    operand2: int    # 32-bit value
+    operand1: int  # 32-bit value
+    operand2: int  # 32-bit value
 
     # -- branch / jump helpers --
 
@@ -166,9 +166,7 @@ def _parse_reader(r: BinaryReader) -> MovieObjectBDMV:
             try:
                 commands.append(_decode_nav_command(raw))
             except Exception:
-                log.warning(
-                    "Failed to decode nav command in object %d", idx, exc_info=True
-                )
+                log.warning("Failed to decode nav command in object %d", idx, exc_info=True)
 
         objects.append(
             MovieObject(

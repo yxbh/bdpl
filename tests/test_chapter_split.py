@@ -1,11 +1,12 @@
 """Tests for chapter-based episode splitting (disc2 fixture)."""
+
 from pathlib import Path
 
 import pytest
 
-from bdpl.bdmv.mpls import parse_mpls_dir
-from bdpl.bdmv.clpi import parse_clpi_dir
 from bdpl.analyze import scan_disc
+from bdpl.bdmv.clpi import parse_clpi_dir
+from bdpl.bdmv.mpls import parse_mpls_dir
 
 _DISC2 = Path(__file__).parent / "fixtures" / "disc2"
 
@@ -47,5 +48,5 @@ class TestChapterSplitting:
             seg_a = da.episodes[i].segments[0]
             seg_b = da.episodes[i + 1].segments[0]
             assert seg_a.out_ms <= seg_b.in_ms, (
-                f"Ep {i+1} end {seg_a.out_ms} overlaps Ep {i+2} start {seg_b.in_ms}"
+                f"Ep {i + 1} end {seg_a.out_ms} overlaps Ep {i + 2} start {seg_b.in_ms}"
             )

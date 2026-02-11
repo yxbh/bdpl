@@ -42,7 +42,9 @@ _CODEC_NAME: dict[int, str] = {
 
 
 def _parse_stream_attrs(
-    r: BinaryReader, coding_type: int, attr_len: int,
+    r: BinaryReader,
+    coding_type: int,
+    attr_len: int,
 ) -> tuple[str, dict]:
     """Return (lang, extra) for a stream based on its coding_type."""
     lang = ""

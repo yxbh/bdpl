@@ -77,15 +77,11 @@ def detect_play_all(playlists: list[Playlist]) -> list[Playlist]:
 
         # Also check: does this playlist contain multiple segments that
         # each appear in standalone (single-item) playlists?
-        contained_singles = sum(
-            1 for k in pl_segments[pl.mpls] if k in single_segments
-        )
+        contained_singles = sum(1 for k in pl_segments[pl.mpls] if k in single_segments)
 
         # Or: is this playlist much longer than most others and has
         # multiple long items?
-        long_items = sum(
-            1 for pi in pl.play_items if pi.duration_seconds > 600
-        )
+        long_items = sum(1 for pi in pl.play_items if pi.duration_seconds > 600)
 
         if is_superset or contained_singles >= 2 or long_items >= 2:
             play_all.append(pl)

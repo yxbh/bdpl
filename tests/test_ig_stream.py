@@ -6,9 +6,9 @@ import pytest
 
 from bdpl.bdmv.ig_stream import (
     InteractiveComposition,
-    parse_ics,
-    extract_menu_hints,
     _extract_ics_data,
+    extract_menu_hints,
+    parse_ics,
 )
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "disc2"
@@ -72,9 +72,7 @@ def test_hints_contain_register_sets(ics: InteractiveComposition):
 def test_hints_episode_register_pattern(ics: InteractiveComposition):
     """Disc2 episode selection buttons SET reg6 to episode indices 0-5."""
     hints = extract_menu_hints(ics)
-    reg6_values = sorted(set(
-        h.register_sets[6] for h in hints if 6 in h.register_sets
-    ))
+    reg6_values = sorted(set(h.register_sets[6] for h in hints if 6 in h.register_sets))
     # reg6 values 0-5 map to episode/segment selection
     assert 0 in reg6_values
     assert len(reg6_values) >= 4
@@ -87,9 +85,7 @@ def test_episode_chapter_pattern(ics: InteractiveComposition):
     """
     hints = extract_menu_hints(ics)
     # Find hints where register 2 is set (chapter mark index)
-    reg2_values = sorted(
-        h.register_sets[2] for h in hints if 2 in h.register_sets
-    )
+    reg2_values = sorted(h.register_sets[2] for h in hints if 2 in h.register_sets)
     # Should contain at least {0, 5, 10, 15}
     expected = {0, 5, 10, 15}
     assert expected.issubset(set(reg2_values)), (
@@ -107,7 +103,7 @@ def test_extract_ics_from_padded_stream():
     # Build a tiny fake PES stream: one PDS segment + one ICS segment
     pds_body = b"\x00" * 4
     pds = bytes([0x16]) + len(pds_body).to_bytes(2, "big") + pds_body
-    ics_body = b"\xDE\xAD"
+    ics_body = b"\xde\xad"
     ics_seg = bytes([0x18]) + len(ics_body).to_bytes(2, "big") + ics_body
     pes = pds + ics_seg
 

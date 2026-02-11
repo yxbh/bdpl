@@ -1,5 +1,7 @@
 """Tests for MovieObject.bdmv parser."""
+
 import pytest
+
 from bdpl.bdmv.movieobject_bdmv import parse_movieobject_bdmv
 
 

@@ -13,9 +13,7 @@ _PREVIEW_MAX = 60
 _BODY_MIN_S = 300  # 5 minutes
 
 
-def label_segments(
-    playlists: list[Playlist], segment_freq: dict[tuple, int]
-) -> None:
+def label_segments(playlists: list[Playlist], segment_freq: dict[tuple, int]) -> None:
     """Mutate PlayItem.label in-place based on segment frequency and position.
 
     Rules applied in priority order:
@@ -56,17 +54,13 @@ def label_segments(
                 continue
 
             # First in episode playlists, 60-120s → OP
-            if (
-                _OP_ED_MIN <= dur_s <= _OP_ED_MAX
-                and first_seg_count.get(key, 0) >= 2
-            ):
+            if _OP_ED_MIN <= dur_s <= _OP_ED_MAX and first_seg_count.get(key, 0) >= 2:
                 pi.label = "OP"
                 continue
 
             # Last or second-to-last in episode playlists, 60-120s → ED
             if _OP_ED_MIN <= dur_s <= _OP_ED_MAX and (
-                last_seg_count.get(key, 0) >= 2
-                or second_last_seg_count.get(key, 0) >= 2
+                last_seg_count.get(key, 0) >= 2 or second_last_seg_count.get(key, 0) >= 2
             ):
                 pi.label = "ED"
                 continue
@@ -89,9 +83,7 @@ def label_segments(
             pi.label = "UNKNOWN"
 
 
-def classify_playlists(
-    playlists: list[Playlist], play_all: list[Playlist]
-) -> dict[str, str]:
+def classify_playlists(playlists: list[Playlist], play_all: list[Playlist]) -> dict[str, str]:
     """Return dict mpls_name -> category string.
 
     Categories: 'episode', 'play_all', 'menu', 'extra', 'bumper',

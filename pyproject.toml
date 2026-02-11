@@ -35,4 +35,4 @@ select = ["E", "F", "W", "I"]  # pycodestyle, Pyflakes, pycodestyle warnings, is
 
 [tool.ruff.format]
 quote-style = "double"
-indent-width = 4
+indent-style = "space"

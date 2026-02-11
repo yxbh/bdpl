@@ -6,18 +6,19 @@ play these with chapters, track names, and (mostly) seamless joins.
 
 Requires ``mkvmerge`` (MKVToolNix) on PATH or specified explicitly.
 """
+
 from __future__ import annotations
 
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from pathlib import Path
-from uuid import uuid4
 
 from bdpl.model import DiscAnalysis, Playlist, SpecialFeature, ticks_to_ms
 
-
 # ── helpers ──────────────────────────────────────────────────────────
+
 
 def _find_mkvmerge() -> str | None:
     """Return path to mkvmerge if found, else None."""
@@ -93,10 +94,10 @@ def _chapters_for_episode(
     else:
         # Standard path: match chapters to play items by index
         # Build a set of clip_ids for this episode's segments
-        ep_clip_ids = [seg.clip_id for seg in ep.segments]
+        [seg.clip_id for seg in ep.segments]
 
         # Map play-item index → clip_id for matching chapters
-        pi_clip_map = {i: pi.clip_id for i, pi in enumerate(pl.play_items)}
+        {i: pi.clip_id for i, pi in enumerate(pl.play_items)}
 
         # Accumulate offset as we walk through episode segments in order.
         seg_offset_ms = 0.0
@@ -135,6 +136,7 @@ def _chapters_for_episode(
 
 # ── XML chapter file generation ──────────────────────────────────────
 
+
 def _build_chapter_xml(chapters: list[tuple[float, str]]) -> str:
     """Build a Matroska XML chapters string."""
     root = ET.Element("Chapters")
@@ -150,12 +152,11 @@ def _build_chapter_xml(chapters: list[tuple[float, str]]) -> str:
         ET.SubElement(disp, "ChapterLanguage").text = "und"
 
     ET.indent(root, space="  ")
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
-        root, encoding="unicode"
-    )
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding="unicode")
 
 
 # ── public API ───────────────────────────────────────────────────────
+
 
 def export_chapter_mkv(
     analysis: DiscAnalysis,
@@ -163,7 +164,7 @@ def export_chapter_mkv(
     stream_dir: str | Path | None = None,
     mkvmerge_path: str | None = None,
     dry_run: bool = False,
-    on_progress: "Callable[[int, int, str], None] | None" = None,
+    on_progress: Callable[[int, int, str], None] | None = None,
     pattern: str = "{name} - S01E{ep:02d}.mkv",
 ) -> list[Path]:
     """Generate one lightweight MKV per episode with chapters and track names.
@@ -231,9 +232,13 @@ def export_chapter_mkv(
         needs_split = (
             len(ep.segments) == 1
             and ep.segments[0].clip_id in clip_pts_base
-            and ep.duration_ms < 0.95 * sum(
-                pi.duration_ms for pl in analysis.playlists
-                for pi in pl.play_items if pi.clip_id == ep.segments[0].clip_id
+            and ep.duration_ms
+            < 0.95
+            * sum(
+                pi.duration_ms
+                for pl in analysis.playlists
+                for pi in pl.play_items
+                if pi.clip_id == ep.segments[0].clip_id
             )
         )
 
@@ -296,9 +301,7 @@ def export_chapter_mkv(
         )
         # mkvmerge returns 0 (success) or 1 (warnings) or 2 (error)
         if result.returncode > 1:
-            raise RuntimeError(
-                f"mkvmerge failed for episode {ep.episode}:\n{result.stderr}"
-            )
+            raise RuntimeError(f"mkvmerge failed for episode {ep.episode}:\n{result.stderr}")
 
         # Clean up chapter file
         chapter_file.unlink(missing_ok=True)
@@ -344,9 +347,13 @@ def get_dry_run_commands(
         needs_split = (
             len(ep.segments) == 1
             and ep.segments[0].clip_id in clip_pts_base
-            and ep.duration_ms < 0.95 * sum(
-                pi.duration_ms for pl in analysis.playlists
-                for pi in pl.play_items if pi.clip_id == ep.segments[0].clip_id
+            and ep.duration_ms
+            < 0.95
+            * sum(
+                pi.duration_ms
+                for pl in analysis.playlists
+                for pi in pl.play_items
+                if pi.clip_id == ep.segments[0].clip_id
             )
         )
 
@@ -363,12 +370,14 @@ def get_dry_run_commands(
                 cmd_parts.append("+")
             cmd_parts.append(str(m2ts))
 
-        result.append({
-            "episode": ep.episode,
-            "output": str(mkv_path),
-            "command": cmd_parts,
-            "chapters_xml": chapter_xml,
-        })
+        result.append(
+            {
+                "episode": ep.episode,
+                "output": str(mkv_path),
+                "command": cmd_parts,
+                "chapters_xml": chapter_xml,
+            }
+        )
 
     return result
 
@@ -428,7 +437,7 @@ def export_specials_mkv(
     out_dir: str | Path,
     stream_dir: str | Path | None = None,
     mkvmerge_path: str | None = None,
-    on_progress: "Callable[[int, int, str], None] | None" = None,
+    on_progress: Callable[[int, int, str], None] | None = None,
     pattern: str = "{name} - S00E{idx:02d} - {category}.mkv",
 ) -> list[Path]:
     """Generate one MKV per special feature.
@@ -448,9 +457,7 @@ def export_specials_mkv(
 
     mkvmerge = mkvmerge_path or _find_mkvmerge()
     if mkvmerge is None:
-        raise RuntimeError(
-            "mkvmerge not found. Install MKVToolNix or pass --mkvmerge-path."
-        )
+        raise RuntimeError("mkvmerge not found. Install MKVToolNix or pass --mkvmerge-path.")
 
     # Build clip PTS base map
     clip_pts_base: dict[str, float] = {}
@@ -480,9 +487,7 @@ def export_specials_mkv(
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode > 1:
-            raise RuntimeError(
-                f"mkvmerge failed for special {sf.index}:\n{result.stderr}"
-            )
+            raise RuntimeError(f"mkvmerge failed for special {sf.index}:\n{result.stderr}")
         created.append(mkv_path)
 
     return created
@@ -524,11 +529,13 @@ def get_specials_dry_run(
         mkv_path = out / mkv_name
         cmd = _build_specials_cmd(sf, mkv_path, stream, pl, clip_pts_base, "mkvmerge")
 
-        result.append({
-            "index": sf.index,
-            "category": sf.category,
-            "output": str(mkv_path),
-            "command": cmd,
-        })
+        result.append(
+            {
+                "index": sf.index,
+                "category": sf.category,
+                "output": str(mkv_path),
+                "command": cmd,
+            }
+        )
 
     return result

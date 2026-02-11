@@ -1,7 +1,7 @@
 import os
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "disc1"
 

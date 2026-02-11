@@ -39,9 +39,7 @@ def cluster_by_duration(
     return clusters
 
 
-def pick_representative(
-    cluster: list[Playlist], clips: dict[str, ClipInfo]
-) -> Playlist:
+def pick_representative(cluster: list[Playlist], clips: dict[str, ClipInfo]) -> Playlist:
     """Pick best representative from a cluster.
 
     Prefers the playlist with: more streams on first clip, then more chapters,

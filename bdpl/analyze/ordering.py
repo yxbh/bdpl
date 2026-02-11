@@ -26,6 +26,7 @@ def _episodes_from_individual(
 
     Sort by the body segment's clip_id (clip IDs increase with episode order).
     """
+
     # Sort by first BODY clip_id, falling back to first clip_id
     def _sort_key(pl: Playlist) -> str:
         for pi in pl.play_items:
@@ -96,7 +97,7 @@ def _episodes_from_chapters(
     # Only consider chapters on the main play item (item_ref=0 typically)
     # Build list of (chapter_index, start_time_ms)
     main_item = playlist.play_items[0]
-    base_ms = ticks_to_ms(main_item.in_time)
+    ticks_to_ms(main_item.in_time)
 
     ch_times: list[float] = []
     for ch in playlist.chapters:

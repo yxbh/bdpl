@@ -1,4 +1,5 @@
 """bdpl CLI — Blu-ray disc playlist analyzer."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -124,12 +125,16 @@ def playlist_cmd(
 def remux(
     bdmv: str = typer.Argument(..., help="Path to BDMV directory"),
     out: str = typer.Option("./Episodes", "--out", help="Output directory"),
-    pattern: str = typer.Option("{name} - S01E{ep:02d}.mkv", "--pattern", help="Output filename pattern ({name}=disc folder, {ep}=episode number)"),
+    pattern: str = typer.Option(
+        "{name} - S01E{ep:02d}.mkv",
+        "--pattern",
+        help="Output filename pattern ({name}=disc folder, {ep}=episode number)",
+    ),
     specials: bool = typer.Option(False, "--specials", help="Also remux special features"),
     specials_pattern: str = typer.Option(
         "{name} - S00E{idx:02d} - {category}.mkv",
         "--specials-pattern",
-        help="Filename pattern for special features ({name}=disc folder, {idx}=index, {category}=type)",
+        help="Filename pattern for specials: {name}, {idx}, {category}",
     ),
     mkvmerge_path: str = typer.Option(None, "--mkvmerge-path", help="Path to mkvmerge executable"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print commands without executing"),
@@ -143,8 +148,10 @@ def remux(
     Use --specials to also remux special features (creditless OP/ED, extras).
     """
     from bdpl.export.mkv_chapters import (
-        export_chapter_mkv, get_dry_run_commands,
-        export_specials_mkv, get_specials_dry_run,
+        export_chapter_mkv,
+        export_specials_mkv,
+        get_dry_run_commands,
+        get_specials_dry_run,
     )
 
     analysis = _parse_and_analyze(bdmv)
@@ -154,7 +161,7 @@ def remux(
         for plan in plans:
             console.print(f"\n[bold]Episode {plan['episode']}[/bold] → {plan['output']}")
             console.print(f"  [dim]{' '.join(plan['command'])}[/dim]")
-            console.print(f"  [dim]Chapters:[/dim]")
+            console.print("  [dim]Chapters:[/dim]")
             for line in plan["chapters_xml"].splitlines()[:15]:
                 console.print(f"    {line}")
         if specials:
@@ -168,7 +175,7 @@ def remux(
         return
 
     try:
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+        from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
         total_items = len(analysis.episodes)
         if specials:
@@ -187,12 +194,16 @@ def remux(
                 progress.update(task_id, completed=current - 1, description=f"Remuxing {name}…")
 
             created = export_chapter_mkv(
-                analysis, out, mkvmerge_path=mkvmerge_path,
-                on_progress=_on_progress, pattern=pattern,
+                analysis,
+                out,
+                mkvmerge_path=mkvmerge_path,
+                on_progress=_on_progress,
+                pattern=pattern,
             )
             progress.update(task_id, completed=len(analysis.episodes))
 
             if specials and analysis.special_features:
+
                 def _on_sf_progress(current: int, total: int, name: str) -> None:
                     progress.update(
                         task_id,
@@ -201,8 +212,11 @@ def remux(
                     )
 
                 sf_created = export_specials_mkv(
-                    analysis, out, mkvmerge_path=mkvmerge_path,
-                    on_progress=_on_sf_progress, pattern=specials_pattern,
+                    analysis,
+                    out,
+                    mkvmerge_path=mkvmerge_path,
+                    on_progress=_on_sf_progress,
+                    pattern=specials_pattern,
                 )
                 created.extend(sf_created)
 

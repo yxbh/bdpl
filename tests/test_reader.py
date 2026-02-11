@@ -11,7 +11,7 @@ class TestPrimitiveReads:
     """Test u8, u16, u32, u64 big-endian reads."""
 
     def test_u8(self):
-        r = BinaryReader(b"\xAB")
+        r = BinaryReader(b"\xab")
         assert r.u8() == 0xAB
 
     def test_u16(self):

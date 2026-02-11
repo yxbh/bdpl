@@ -5,18 +5,17 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from bdpl.model import ClipInfo, DiscAnalysis, Playlist, SpecialFeature, Warning, ticks_to_ms
-
-from bdpl.analyze.signatures import compute_signatures, find_duplicates
+from bdpl.analyze.classify import classify_playlists, label_segments
 from bdpl.analyze.clustering import cluster_by_duration, pick_representative
+from bdpl.analyze.explain import explain_disc
+from bdpl.analyze.ordering import order_episodes
 from bdpl.analyze.segment_graph import (
     build_segment_frequency,
-    find_shared_segments,
     detect_play_all,
+    find_shared_segments,
 )
-from bdpl.analyze.classify import label_segments, classify_playlists
-from bdpl.analyze.ordering import order_episodes
-from bdpl.analyze.explain import explain_disc
+from bdpl.analyze.signatures import compute_signatures, find_duplicates
+from bdpl.model import ClipInfo, DiscAnalysis, Playlist, SpecialFeature, Warning, ticks_to_ms
 
 log = logging.getLogger(__name__)
 
@@ -49,13 +48,13 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
     if index_file.is_file():
         try:
             from bdpl.bdmv.index_bdmv import parse_index_bdmv
+
             idx = parse_index_bdmv(index_file)
             hints["index"] = {
                 "first_playback_obj": idx.first_playback_obj,
                 "top_menu_obj": idx.top_menu_obj,
                 "titles": [
-                    {"title": t.title_num, "movie_object": t.movie_object_id}
-                    for t in idx.titles
+                    {"title": t.title_num, "movie_object": t.movie_object_id} for t in idx.titles
                 ],
             }
         except Exception:
@@ -66,6 +65,7 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
     if mobj_file.is_file():
         try:
             from bdpl.bdmv.movieobject_bdmv import parse_movieobject_bdmv
+
             mo = parse_movieobject_bdmv(mobj_file)
             # Build title → playlist mapping via index titles → movie objects
             obj_playlists: dict[int, list[int]] = {}
@@ -99,11 +99,9 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
     return hints
 
 
-def _parse_ig_hints(
-    bdmv_path: Path, clips: dict[str, ClipInfo], hints: dict
-) -> None:
+def _parse_ig_hints(bdmv_path: Path, clips: dict[str, ClipInfo], hints: dict) -> None:
     """Try to parse IG menu streams and add hints in-place."""
-    from bdpl.bdmv.ig_stream import parse_ig_from_m2ts, extract_menu_hints
+    from bdpl.bdmv.ig_stream import extract_menu_hints, parse_ig_from_m2ts
 
     stream_dir = bdmv_path / "STREAM"
     if not stream_dir.is_dir():
@@ -131,17 +129,17 @@ def _parse_ig_hints(
             all_ig_hints.extend(page_hints)
             log.debug(
                 "IG clip %s: %d pages, %d actionable buttons",
-                clip_id, len(ics.pages), len(page_hints),
+                clip_id,
+                len(ics.pages),
+                len(page_hints),
             )
 
     if all_ig_hints:
         hints["ig_menu"] = {
             "hint_count": len(all_ig_hints),
-            "chapter_marks": sorted(set(
-                h.register_sets.get(2)
-                for h in all_ig_hints
-                if 2 in h.register_sets
-            )),
+            "chapter_marks": sorted(
+                set(h.register_sets.get(2) for h in all_ig_hints if 2 in h.register_sets)
+            ),
             "has_direct_play": any(h.playlist is not None for h in all_ig_hints),
         }
         hints["ig_hints_raw"] = all_ig_hints
@@ -165,7 +163,9 @@ def _detect_special_features(
     if not ig_hints_raw or not title_pl:
         # Fall back to classification-only detection (no IG data)
         return _special_features_from_classifications(
-            classifications, playlists, episodes,
+            classifications,
+            playlists,
+            episodes,
         )
 
     # Build set of episode playlists to exclude
@@ -238,13 +238,15 @@ def _detect_special_features(
                 else:
                     dur_ms = end_ms - start_ms
 
-        features.append(SpecialFeature(
-            index=idx,
-            playlist=mpls,
-            duration_ms=dur_ms,
-            category=category,
-            chapter_start=ch_start,
-        ))
+        features.append(
+            SpecialFeature(
+                index=idx,
+                playlist=mpls,
+                duration_ms=dur_ms,
+                category=category,
+                chapter_start=ch_start,
+            )
+        )
         idx += 1
 
     return features
@@ -268,12 +270,14 @@ def _special_features_from_classifications(
         pl = pl_by_name.get(mpls)
         if pl is None:
             continue
-        features.append(SpecialFeature(
-            index=idx,
-            playlist=mpls,
-            duration_ms=pl.duration_ms,
-            category=cat,
-        ))
+        features.append(
+            SpecialFeature(
+                index=idx,
+                playlist=mpls,
+                duration_ms=pl.duration_ms,
+                category=cat,
+            )
+        )
         idx += 1
 
     return features
@@ -296,9 +300,7 @@ def scan_disc(
 
     # 1. Deduplicate playlists
     dup_groups = find_duplicates(playlists)
-    analysis["duplicate_groups"] = [
-        [pl.mpls for pl in group] for group in dup_groups
-    ]
+    analysis["duplicate_groups"] = [[pl.mpls for pl in group] for group in dup_groups]
 
     # Pick representatives — deduplicated working set
     seen_sigs: set[tuple] = set()
@@ -379,9 +381,7 @@ def scan_disc(
         # Build list of chapter-start indices for each episode
         # (episode starts at the chapter whose timestamp matches ep.segments[0].in_ms)
         ep_playlist = episodes[0].playlist
-        match_pl = next(
-            (p for p in unique_playlists if p.mpls == ep_playlist), None
-        )
+        match_pl = next((p for p in unique_playlists if p.mpls == ep_playlist), None)
         if match_pl and match_pl.chapters:
             ch_times = [ticks_to_ms(ch.timestamp) for ch in match_pl.chapters]
             ep_start_indices: list[int] = []
@@ -408,9 +408,7 @@ def scan_disc(
         )
 
     # 7. Extra warnings
-    if play_all and episodes and all(
-        ep.playlist in {p.mpls for p in play_all} for ep in episodes
-    ):
+    if play_all and episodes and all(ep.playlist in {p.mpls for p in play_all} for ep in episodes):
         warnings.append(
             Warning(
                 code="PLAY_ALL_ONLY",
@@ -424,7 +422,10 @@ def scan_disc(
 
     # 8. Detect special features from IG menu + title hints
     special_features = _detect_special_features(
-        hints, classifications, playlists, episodes,
+        hints,
+        classifications,
+        playlists,
+        episodes,
     )
 
     return DiscAnalysis(

@@ -61,7 +61,7 @@ def _parse_index_entry(r: BinaryReader) -> tuple[str | None, int, int]:
         return ("hdmv", movie_object_id, access_type)
 
     if object_type_bits == _OBJ_BDJ:
-        bdj_name = r.read_string(5)
+        r.read_string(5)
         r.skip(3)  # padding
         return ("bdj", 0, access_type)
 
