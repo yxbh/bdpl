@@ -107,6 +107,7 @@ bdpl scan /path/to/BDMV --stdout --compact   # Machine-readable
 Output includes:
 - Full playlist inventory with durations, streams, and chapters
 - Episode candidates with confidence scores
+- Episode scene segments (menu-scene boundaries when available)
 - Special features (creditless OP/ED, extras, previews) detected from IG menus
 - Playlist classifications (episode, play_all, bumper, creditless_op, etc.)
 - Warnings for ambiguous or low-confidence results
@@ -175,7 +176,8 @@ bdpl reads the raw BDMV binary structures — no external tools needed for analy
 5. **Infer** episode order using multiple strategies (see below)
 6. **Boost confidence** when navigation hints and IG menu data confirm episode boundaries
 7. **Detect special features** from IG menu `JumpTitle` buttons pointing to non-episode playlists (creditless OP/ED, extras, previews)
-8. **Export** results as JSON, text reports, M3U playlists, or MKV remux (including specials)
+8. **Extract scenes** for each episode from IG/title hints and chapter anchors (fallback for metadata-only fixtures)
+9. **Export** results as JSON, text reports, M3U playlists, or MKV remux (including specials)
 
 ### Episode Inference Strategies
 
@@ -226,7 +228,22 @@ The `scan` output uses schema version `bdpl.disc.v1`:
     }
   ],
   "episodes": [
-    { "episode": 1, "playlist": "00002.mpls", "duration_ms": 1575073.5, "confidence": 0.70 }
+    {
+      "episode": 1,
+      "playlist": "00002.mpls",
+      "duration_ms": 1575073.5,
+      "confidence": 0.70,
+      "scenes": [
+        {
+          "key": ["SCENE", "00002.mpls", 1],
+          "clip_id": "00007",
+          "in_ms": 0.0,
+          "out_ms": 393768.1,
+          "duration_ms": 393768.1,
+          "label": "SCENE"
+        }
+      ]
+    }
   ],
   "warnings": [{ "code": "PLAY_ALL_ONLY", "message": "..." }],
   "analysis": { "classifications": { "00002.mpls": "play_all" } }
