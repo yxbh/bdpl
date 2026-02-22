@@ -304,7 +304,7 @@ def _maybe_keep_single_title_episode(
     heuristics, while disc navigation clearly presents a separate title for
     digital archive content.
     """
-    if len(episodes) != 2:
+    if len(episodes) < 2:
         return episodes
 
     episode_playlists = {ep.playlist for ep in episodes}
@@ -350,11 +350,19 @@ def _maybe_keep_single_title_episode(
         for pi in playlist.play_items
     ]
 
+    log.debug(
+        "Collapsing %d inferred episodes into one for %s based on title/archive hints",
+        len(episodes),
+        playlist.mpls,
+    )
+
     return [
         Episode(
             episode=1,
             playlist=playlist.mpls,
             duration_ms=playlist.duration_ms,
+            # Higher than chapter-split base (0.6) because title hints
+            # confirm one main feature with a separate archive title.
             confidence=0.85,
             segments=segments,
         )

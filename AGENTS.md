@@ -94,7 +94,7 @@ These can reveal episode→chapter mappings embedded in the disc menu structure:
 
 ### Python Setup
 ```bash
-# Python 3.12+ required
+# Python 3.10+ required (3.12 recommended)
 pip install -e ".[dev]"
 ```
 

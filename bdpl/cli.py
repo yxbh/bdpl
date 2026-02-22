@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 
 import typer
@@ -20,6 +21,14 @@ from bdpl.export.m3u import export_m3u
 
 app = typer.Typer(name="bdpl", help="Blu-ray disc playlist analyzer")
 console = Console(stderr=True)
+
+
+class ImageFormat(str, Enum):
+    """Supported output image formats for archive extraction."""
+
+    jpg = "jpg"
+    jpeg = "jpeg"
+    png = "png"
 
 
 def resolve_bdmv(path_str: str) -> Path:
@@ -240,7 +249,7 @@ def remux(
 def archive_cmd(
     bdmv: str = typer.Argument(..., help="Path to BDMV directory"),
     out: str = typer.Option("./DigitalArchive", "--out", help="Output directory for images"),
-    image_format: str = typer.Option("jpg", "--format", help="Image format: jpg or png"),
+    image_format: ImageFormat = typer.Option(ImageFormat.jpg, "--format", help="Image format"),
     ffmpeg_path: str = typer.Option(None, "--ffmpeg-path", help="Path to ffmpeg executable"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print commands without executing"),
 ):
@@ -250,32 +259,38 @@ def archive_cmd(
     archive item using ffmpeg.
     """
     analysis = _parse_and_analyze(bdmv)
+    image_fmt = image_format.value
 
-    try:
-        if dry_run:
+    if dry_run:
+        try:
             plans = get_digital_archive_dry_run(
                 analysis,
                 out,
                 ffmpeg_path=ffmpeg_path,
-                image_format=image_format,
+                image_format=image_fmt,
             )
-            if not plans:
-                console.print("[yellow]No digital archive playlists found.[/yellow]")
-                return
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1)
 
-            for plan in plans:
-                console.print(
-                    f"[bold]{plan['playlist']}[/bold] item {plan['index']:03d}"
-                    f" ({plan['clip_id']})"
-                )
-                console.print(f"  [dim]{' '.join(plan['command'])}[/dim]")
+        if not plans:
+            console.print("[yellow]No digital archive playlists found.[/yellow]")
             return
 
+        for plan in plans:
+            console.print(
+                f"[bold]{plan['playlist']}[/bold] item {plan['index']:03d}"
+                f" ({plan['clip_id']})"
+            )
+            console.print(f"  [dim]{' '.join(plan['command'])}[/dim]")
+        return
+
+    try:
         created = export_digital_archive_images(
             analysis,
             out,
             ffmpeg_path=ffmpeg_path,
-            image_format=image_format,
+            image_format=image_fmt,
         )
     except (RuntimeError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")

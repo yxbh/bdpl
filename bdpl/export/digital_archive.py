@@ -97,6 +97,14 @@ def _output_name(item: ArchiveItem, image_format: str) -> str:
     return f"{stem}-{item.index:03d}-{item.clip_id}.{image_format}"
 
 
+def _resolve_output_path(out: Path, item: ArchiveItem, image_format: str) -> Path:
+    """Resolve output path and block path traversal outside out directory."""
+    output = (out / _output_name(item, image_format)).resolve()
+    if not output.is_relative_to(out):
+        raise ValueError(f"Output path escapes target directory: {output}")
+    return output
+
+
 def _build_ffmpeg_cmd(
     ffmpeg: str,
     stream_file: Path,
@@ -145,7 +153,7 @@ def get_digital_archive_dry_run(
     result: list[dict] = []
     for item in collect_archive_items(analysis):
         source = stream / f"{item.clip_id}.m2ts"
-        output = out / _output_name(item, fmt)
+        output = _resolve_output_path(out, item, fmt)
         cmd = _build_ffmpeg_cmd(ffmpeg, source, output, item.in_ms, fmt)
         result.append(
             {
@@ -165,7 +173,6 @@ def export_digital_archive_images(
     stream_dir: str | Path | None = None,
     ffmpeg_path: str | None = None,
     image_format: str = "jpg",
-    dry_run: bool = False,
 ) -> list[Path]:
     """Extract one still image for each digital archive entry.
 
@@ -185,27 +192,36 @@ def export_digital_archive_images(
         stream = Path(stream_dir).resolve()
 
     ffmpeg = ffmpeg_path or _find_ffmpeg()
-    if ffmpeg is None and not dry_run:
+    if ffmpeg is None:
         raise RuntimeError("ffmpeg not found. Install ffmpeg or pass --ffmpeg-path.")
 
     created: list[Path] = []
+    errors: list[str] = []
     for item in items:
         source = stream / f"{item.clip_id}.m2ts"
-        output = out / _output_name(item, fmt)
-
-        cmd = _build_ffmpeg_cmd(ffmpeg or "ffmpeg", source, output, item.in_ms, fmt)
-        if dry_run:
-            continue
+        output = _resolve_output_path(out, item, fmt)
 
         if not source.is_file():
-            raise RuntimeError(f"Source stream file not found: {source}")
+            errors.append(f"{item.playlist} item {item.index} ({item.clip_id}): source not found")
+            continue
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        cmd = _build_ffmpeg_cmd(ffmpeg, source, output, item.in_ms, fmt)
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except OSError as exc:
+            errors.append(f"{item.playlist} item {item.index} ({item.clip_id}): {exc}")
+            continue
         if result.returncode != 0:
-            raise RuntimeError(
-                f"ffmpeg failed for {item.playlist} item {item.index} ({item.clip_id}):\n"
-                f"{result.stderr.strip()}"
+            errors.append(
+                f"{item.playlist} item {item.index} ({item.clip_id}): {result.stderr.strip()}"
             )
+            continue
         created.append(output)
+
+    if errors:
+        raise RuntimeError(
+            f"ffmpeg failed for {len(errors)} items:\n" + "\n".join(errors)
+        )
 
     return created

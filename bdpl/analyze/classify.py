@@ -114,7 +114,7 @@ def classify_playlists(playlists: list[Playlist], play_all: list[Playlist]) -> d
     """Return dict mpls_name -> category string.
 
     Categories: 'episode', 'play_all', 'menu', 'extra', 'bumper',
-    'creditless_op', 'creditless_ed'.
+    'creditless_op', 'creditless_ed', 'digital_archive'.
     """
     play_all_names = {pl.mpls for pl in play_all}
     result: dict[str, str] = {}
