@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-PYTHON = sys.executable
-_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "disc1"
+PYTHON: str = sys.executable
+_FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc1"
 
 
 def _bdmv() -> str:
     """Resolve BDMV path from env var or bundled fixtures."""
-    env = os.environ.get("BDPL_TEST_BDMV")
+    env: str | None = os.environ.get("BDPL_TEST_BDMV")
     if env:
         p = Path(env)
         if (p / "BDMV" / "PLAYLIST").is_dir():
@@ -26,9 +26,9 @@ def _bdmv() -> str:
 
 
 class TestScanStdout:
-    def test_scan_stdout(self):
+    def test_scan_stdout(self) -> None:
         """Run `bdpl scan --stdout` and verify JSON output."""
-        result = subprocess.run(
+        result: subprocess.CompletedProcess[str] = subprocess.run(
             [PYTHON, "-m", "bdpl.cli", "scan", _bdmv(), "--stdout"],
             capture_output=True,
             text=True,
@@ -42,15 +42,15 @@ class TestScanStdout:
 
 
 class TestExplainOutput:
-    def test_explain_output(self):
+    def test_explain_output(self) -> None:
         """Run `bdpl explain` and verify text output contains expected sections."""
-        result = subprocess.run(
+        result: subprocess.CompletedProcess[str] = subprocess.run(
             [PYTHON, "-m", "bdpl.cli", "explain", _bdmv()],
             capture_output=True,
             text=True,
             timeout=60,
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"
-        output = result.stdout
+        output: str = result.stdout
         assert "Episodes" in output
         assert "Playlists" in output
