@@ -93,12 +93,6 @@ def _chapters_for_episode(
                 chapters.append((rel_ms, f"Chapter {len(chapters) + 1}"))
     else:
         # Standard path: match chapters to play items by index
-        # Build a set of clip_ids for this episode's segments
-        [seg.clip_id for seg in ep.segments]
-
-        # Map play-item index → clip_id for matching chapters
-        {i: pi.clip_id for i, pi in enumerate(pl.play_items)}
-
         # Accumulate offset as we walk through episode segments in order.
         seg_offset_ms = 0.0
         for seg in ep.segments:
@@ -448,9 +442,7 @@ def export_specials_mkv(
     if not analysis.special_features:
         return []
 
-    specials = [
-        sf for sf in analysis.special_features if (sf.menu_visible or not visible_only)
-    ]
+    specials = [sf for sf in analysis.special_features if (sf.menu_visible or not visible_only)]
     if not specials:
         return []
 
@@ -511,9 +503,7 @@ def get_specials_dry_run(
     if not analysis.special_features:
         return []
 
-    specials = [
-        sf for sf in analysis.special_features if (sf.menu_visible or not visible_only)
-    ]
+    specials = [sf for sf in analysis.special_features if (sf.menu_visible or not visible_only)]
     if not specials:
         return []
 
@@ -546,6 +536,7 @@ def get_specials_dry_run(
         result.append(
             {
                 "index": sf.index,
+                "playlist": sf.playlist,
                 "category": sf.category,
                 "output": str(mkv_path),
                 "command": cmd,

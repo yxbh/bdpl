@@ -322,6 +322,8 @@ def _apply_menu_visibility_from_hints(features: list[SpecialFeature], hints: dic
             feature.menu_visible = _is_likely_menu_visible_special(feature)
         return
 
+    # Best effort: IG-derived count approximates number of visible content
+    # entries, then ranking chooses the most likely visible features.
     ranked = sorted(features, key=_special_visibility_score, reverse=True)
     visible_keys = {
         (feature.playlist, feature.chapter_start, feature.index)
