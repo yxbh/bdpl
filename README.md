@@ -28,6 +28,9 @@ bdpl explain /path/to/BDMV
 # Generate debug playlists for previewing in a media player
 bdpl playlist /path/to/BDMV --out ./Playlists
 
+# Extract menu-driven digital archive stills as images
+bdpl archive /path/to/BDMV --out ./DigitalArchive
+
 # Remux episodes to MKV with chapters and named tracks
 bdpl remux /path/to/BDMV --out ./Episodes
 ```
@@ -143,6 +146,20 @@ Default filenames use Plex/Jellyfin-compatible `SxxExx` format with the disc fol
 (e.g., `UCG_0080_D1 - S01E01.mkv`, `UCG_0080_D1 - S00E01 - creditless_op.mkv`).
 Pattern variables: `{name}` (disc folder), `{ep}` (episode #), `{idx}` (special #), `{category}` (special type).
 
+### `bdpl archive`
+
+Extract still images for digital archive playlists (menu/gallery-style content).
+
+```bash
+bdpl archive /path/to/BDMV --out ./DigitalArchive
+bdpl archive /path/to/BDMV --format png
+bdpl archive /path/to/BDMV --dry-run
+```
+
+The command detects playlists classified as `digital_archive` and captures one
+frame per archive item via `ffmpeg`, naming outputs as
+`{playlist}-{index}-{clip_id}.{ext}`.
+
 ## How It Works
 
 bdpl reads the raw BDMV binary structures — no external tools needed for analysis:
@@ -165,6 +182,9 @@ bdpl reads the raw BDMV binary structures — no external tools needed for analy
 - **Individual episode playlists**: Each episode has its own MPLS with a unique "body" segment, plus shared OP/ED. Episodes are ordered by body clip ID.
 - **Play All decomposition**: Some discs (common in anime) only have a single "Play All" playlist. bdpl decomposes it — each long play item (>10 min) becomes an episode.
 - **Chapter-based splitting**: When a disc has a single long m2ts with multiple chapters but no separate playlists, bdpl splits into episodes using chapter boundaries and target duration heuristics.
+
+When disc hints show a single main title plus a separate digital archive title,
+bdpl keeps the main title as one episode instead of forcing chapter-based splits.
 
 ### Confidence Scoring
 

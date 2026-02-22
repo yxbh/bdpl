@@ -1,5 +1,11 @@
 """Output formatters (JSON, text, m3u, mkv chapters)."""
 
+from bdpl.export.digital_archive import (
+    export_digital_archive_images as export_digital_archive_images,
+)
+from bdpl.export.digital_archive import (
+    get_digital_archive_dry_run as get_digital_archive_dry_run,
+)
 from bdpl.export.json_out import analysis_to_dict as analysis_to_dict
 from bdpl.export.json_out import export_json as export_json
 from bdpl.export.m3u import export_m3u as export_m3u
