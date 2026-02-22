@@ -79,12 +79,21 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
             mo = parse_movieobject_bdmv(mobj_file)
             # Build title → playlist mapping via index titles → movie objects
             obj_playlists: dict[int, list[int]] = {}
+            obj_play_marks: dict[int, list[tuple[int, int]]] = {}
             for obj in mo.objects:
                 if obj.referenced_playlists:
                     obj_playlists[obj.object_id] = obj.referenced_playlists
+                marks = [
+                    (cmd.operand1, cmd.operand2)
+                    for cmd in obj.commands
+                    if cmd.group == 0 and cmd.sub_group == 2 and cmd.op_code == 2
+                ]
+                if marks:
+                    obj_play_marks[obj.object_id] = marks
             hints["movie_objects"] = {
                 "count": len(mo.objects),
                 "obj_playlists": obj_playlists,
+                "obj_play_marks": obj_play_marks,
             }
         except Exception:
             log.debug("Failed to parse MovieObject.bdmv", exc_info=True)
@@ -263,17 +272,43 @@ def _detect_special_features(
 
     # Supplement direct IG-derived features with title-hint specials when
     # menus jump via intermediate logic and only expose a subset of targets.
-    title_hint_playlists = _title_hint_non_episode_playlists(hints, classifications, episodes)
-    existing_playlists = {feature.playlist for feature in features}
+    title_hint_entries = _title_hint_non_episode_entries(hints, classifications, episodes)
+    existing_keys = {(feature.playlist, feature.chapter_start) for feature in features}
     pl_by_name = {pl.mpls: pl for pl in playlists}
-    for mpls in title_hint_playlists:
-        if mpls in existing_playlists:
-            continue
+    for mpls, chapter_starts in title_hint_entries:
         pl = pl_by_name.get(mpls)
         if pl is None:
             continue
         category = classifications.get(mpls, "extra")
         if category in {"episode", "play_all"}:
+            continue
+
+        if chapter_starts and pl.chapters:
+            for chapter_idx, chapter_start in enumerate(chapter_starts):
+                key = (mpls, chapter_start)
+                if key in existing_keys:
+                    continue
+                chapter_end = (
+                    chapter_starts[chapter_idx + 1]
+                    if chapter_idx + 1 < len(chapter_starts)
+                    else None
+                )
+                features.append(
+                    SpecialFeature(
+                        index=idx,
+                        playlist=mpls,
+                        duration_ms=_duration_from_chapter_window(pl, chapter_start, chapter_end),
+                        category=category,
+                        chapter_start=chapter_start,
+                        menu_visible=True,
+                    )
+                )
+                existing_keys.add(key)
+                idx += 1
+            continue
+
+        key = (mpls, None)
+        if key in existing_keys:
             continue
         features.append(
             SpecialFeature(
@@ -284,35 +319,82 @@ def _detect_special_features(
                 menu_visible=True,
             )
         )
+        existing_keys.add(key)
         idx += 1
 
     return features
 
 
-def _title_hint_non_episode_playlists(
+def _title_hint_non_episode_entries(
     hints: dict,
     classifications: dict[str, str],
     episodes: list,
-) -> list[str]:
-    """Return ordered playlist names referenced by titles that are not episodes/play_all."""
+) -> list[tuple[str, list[int]]]:
+    """Return ordered non-episode title-hint playlists and optional chapter starts."""
     title_pl = hints.get("title_playlists", {})
     if not title_pl:
         return []
 
+    title_to_object = {
+        entry["title"]: entry["movie_object"] for entry in hints.get("index", {}).get("titles", [])
+    }
+    obj_play_marks = hints.get("movie_objects", {}).get("obj_play_marks", {})
+
     ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
     play_all_set = {mpls for mpls, cat in classifications.items() if cat == "play_all"}
 
-    ordered: list[str] = []
-    seen: set[str] = set()
+    ordered: list[tuple[str, list[int]]] = []
+    seen: set[tuple[str, tuple[int, ...]]] = set()
     for title_num, pl_nums in sorted(title_pl.items()):
         if not pl_nums:
             continue
-        mpls = f"{pl_nums[0]:05d}.mpls"
-        if mpls in seen or mpls in ep_playlists or mpls in play_all_set:
+        playlist_num = pl_nums[0]
+        mpls = f"{playlist_num:05d}.mpls"
+        if mpls in ep_playlists or mpls in play_all_set:
             continue
-        ordered.append(mpls)
-        seen.add(mpls)
+
+        chapter_starts: list[int] = []
+        object_id = title_to_object.get(title_num)
+        if object_id is not None:
+            starts = {
+                mark
+                for pl_num, mark in obj_play_marks.get(object_id, [])
+                if pl_num == playlist_num and mark >= 0
+            }
+            if starts:
+                starts = starts | {0}
+                chapter_starts = sorted(starts)
+
+        key = (mpls, tuple(chapter_starts))
+        if key in seen:
+            continue
+
+        ordered.append((mpls, chapter_starts))
+        seen.add(key)
     return ordered
+
+
+def _duration_from_chapter_window(
+    playlist: Playlist,
+    chapter_start: int,
+    chapter_end: int | None,
+) -> float:
+    """Return duration in ms for a chapter window within a playlist."""
+    if not playlist.chapters:
+        return playlist.duration_ms
+
+    chapter_times = [ticks_to_ms(chapter.timestamp) for chapter in playlist.chapters]
+    if chapter_start < 0 or chapter_start >= len(chapter_times):
+        return playlist.duration_ms
+
+    start_ms = chapter_times[chapter_start]
+    if chapter_end is not None and 0 <= chapter_end < len(chapter_times):
+        end_ms = chapter_times[chapter_end]
+    else:
+        end_ms = ticks_to_ms(playlist.play_items[-1].out_time)
+
+    duration_ms = end_ms - start_ms
+    return duration_ms if duration_ms > 0 else playlist.duration_ms
 
 
 def _infer_visible_button_count_from_ig(hints: dict) -> int:
@@ -401,15 +483,40 @@ def _special_features_from_classifications(
     features: list[SpecialFeature] = []
     idx = 1
 
-    title_hint_playlists = _title_hint_non_episode_playlists(hints or {}, classifications, episodes)
-    if title_hint_playlists:
-        for mpls in title_hint_playlists:
+    title_hint_entries = _title_hint_non_episode_entries(hints or {}, classifications, episodes)
+    if title_hint_entries:
+        for mpls, chapter_starts in title_hint_entries:
             pl = pl_by_name.get(mpls)
             if pl is None:
                 continue
             category = classifications.get(mpls, "extra")
             if category in {"episode", "play_all"}:
                 category = "extra"
+
+            if chapter_starts and pl.chapters:
+                for chapter_idx, chapter_start in enumerate(chapter_starts):
+                    chapter_end = (
+                        chapter_starts[chapter_idx + 1]
+                        if chapter_idx + 1 < len(chapter_starts)
+                        else None
+                    )
+                    features.append(
+                        SpecialFeature(
+                            index=idx,
+                            playlist=mpls,
+                            duration_ms=_duration_from_chapter_window(
+                                pl,
+                                chapter_start,
+                                chapter_end,
+                            ),
+                            category=category,
+                            chapter_start=chapter_start,
+                            menu_visible=True,
+                        )
+                    )
+                    idx += 1
+                continue
+
             features.append(
                 SpecialFeature(
                     index=idx,

@@ -54,3 +54,13 @@ def test_disc_special_visibility_expectation_matrix(
 
     assert total == expected_total
     assert visible == expected_visible
+
+
+def test_disc1_special_chapter_split_expectation(disc1_analysis: DiscAnalysis) -> None:
+    """Validate disc1 chapter-split specials for playlist 00008.mpls."""
+    chapter_starts = sorted(
+        feature.chapter_start
+        for feature in disc1_analysis.special_features
+        if feature.playlist == "00008.mpls" and feature.chapter_start is not None
+    )
+    assert chapter_starts == [0, 3]

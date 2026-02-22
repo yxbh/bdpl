@@ -52,6 +52,23 @@ class TestWarningsEmitted:
         assert "PLAY_ALL_ONLY" in codes
 
 
+class TestSpecialFeatures:
+    def test_special_feature_count(self, disc1_analysis: DiscAnalysis) -> None:
+        """Verify disc1 exposes 9 special features."""
+        assert len(disc1_analysis.special_features) == 9
+
+    def test_playlist_00008_has_two_chapter_split_specials(
+        self, disc1_analysis: DiscAnalysis
+    ) -> None:
+        """Verify playlist 00008.mpls is exposed as two chapter-targeted specials."""
+        chapter_starts = sorted(
+            sf.chapter_start
+            for sf in disc1_analysis.special_features
+            if sf.playlist == "00008.mpls" and sf.chapter_start is not None
+        )
+        assert chapter_starts == [0, 3]
+
+
 class TestJsonExport:
     def test_json_export_valid(self, disc1_analysis: DiscAnalysis) -> None:
         """Verify JSON export is valid JSON and has required keys."""
