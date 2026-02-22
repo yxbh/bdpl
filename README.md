@@ -281,3 +281,8 @@ bdpl/
 ## License
 
 MIT
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, validation steps,
+and fixture safety rules.
