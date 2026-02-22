@@ -459,6 +459,27 @@ def _downsample_scene_starts(starts_ms: list[float], target_count: int = 4) -> l
     return [starts_ms[i] for i in sorted(indices)]
 
 
+def _sanitize_scene_starts(
+    starts_ms: list[float],
+    duration_ms: float,
+    *,
+    target_count: int = 4,
+    min_tail_ms: float = 120_000,
+) -> list[float]:
+    """Normalize raw scene start anchors and avoid terminal end-mark artifacts."""
+    starts = sorted({start for start in starts_ms if 0 <= start < duration_ms})
+    if not starts:
+        return []
+
+    # Some playlists contain a final chapter marker ~end_of_episode; keep it
+    # out of scene starts when enough earlier anchors are available.
+    trimmed = [start for start in starts if start <= duration_ms - min_tail_ms]
+    if len(trimmed) >= target_count:
+        return trimmed
+
+    return starts
+
+
 def _scene_mark_indices_from_ig(hints: dict) -> dict[str, list[int]]:
     """Collect chapter-mark indices from IG button hints by target playlist."""
     ig_hints_raw = hints.get("ig_hints_raw", [])
@@ -559,7 +580,9 @@ def _build_episode_scenes(episodes: list[Episode], playlists: list[Playlist], hi
                 if 0 <= ticks_to_ms(chapter.timestamp - base_in) < episode.duration_ms
             ]
             starts = sorted(set(starts))
-            starts = _downsample_scene_starts(starts, target_count=4)
+
+        starts = _sanitize_scene_starts(starts, episode.duration_ms, target_count=4)
+        starts = _downsample_scene_starts(starts, target_count=4)
 
         if not starts:
             starts = [0.0]

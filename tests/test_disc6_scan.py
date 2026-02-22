@@ -20,6 +20,16 @@ def test_disc6_each_episode_has_four_scenes(disc6_analysis: DiscAnalysis) -> Non
         )
 
 
+def test_disc6_last_scene_is_substantial(disc6_analysis: DiscAnalysis) -> None:
+    """Final scene should be substantial (credits), not a near-zero tail."""
+    for episode in disc6_analysis.episodes:
+        assert episode.scenes, f"Episode {episode.episode} has no scenes"
+        assert episode.scenes[-1].duration_ms >= 120_000, (
+            f"Episode {episode.episode} final scene too short: "
+            f"{episode.scenes[-1].duration_ms / 1000.0:.3f}s"
+        )
+
+
 def test_disc6_has_three_special_features(disc6_analysis: DiscAnalysis) -> None:
     """Disc6 should expose exactly three special features."""
     assert len(disc6_analysis.special_features) == 3
