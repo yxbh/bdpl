@@ -11,6 +11,33 @@ _EXTRA_MIN = 180
 _EPISODE_MIN = 600  # 10 minutes
 _PREVIEW_MAX = 60
 _BODY_MIN_S = 300  # 5 minutes
+_DIGITAL_ARCHIVE_MIN_ITEMS = 20
+_DIGITAL_ARCHIVE_MAX_TOTAL_S = 300
+_DIGITAL_ARCHIVE_MAX_AVG_ITEM_S = 0.5
+_DIGITAL_ARCHIVE_MIN_UNIQUE_RATIO = 0.8
+
+
+def is_digital_archive_playlist(pl: Playlist) -> bool:
+    """Return True when playlist shape resembles an image archive.
+
+    Heuristic targets menu-like playlists made of many ultra-short items
+    (often one still image per clip) and avoids short video extras.
+    """
+    item_count = len(pl.play_items)
+    if item_count < _DIGITAL_ARCHIVE_MIN_ITEMS:
+        return False
+
+    total_s = pl.duration_seconds
+    if total_s > _DIGITAL_ARCHIVE_MAX_TOTAL_S:
+        return False
+
+    avg_item_s = total_s / item_count
+    if avg_item_s > _DIGITAL_ARCHIVE_MAX_AVG_ITEM_S:
+        return False
+
+    unique_clip_count = len({pi.clip_id for pi in pl.play_items})
+    unique_ratio = unique_clip_count / item_count
+    return unique_ratio >= _DIGITAL_ARCHIVE_MIN_UNIQUE_RATIO
 
 
 def label_segments(playlists: list[Playlist], segment_freq: dict[tuple, int]) -> None:
@@ -87,7 +114,7 @@ def classify_playlists(playlists: list[Playlist], play_all: list[Playlist]) -> d
     """Return dict mpls_name -> category string.
 
     Categories: 'episode', 'play_all', 'menu', 'extra', 'bumper',
-    'creditless_op', 'creditless_ed'.
+    'creditless_op', 'creditless_ed', 'digital_archive'.
     """
     play_all_names = {pl.mpls for pl in play_all}
     result: dict[str, str] = {}
@@ -97,6 +124,10 @@ def classify_playlists(playlists: list[Playlist], play_all: list[Playlist]) -> d
 
         if pl.mpls in play_all_names:
             result[pl.mpls] = "play_all"
+            continue
+
+        if is_digital_archive_playlist(pl):
+            result[pl.mpls] = "digital_archive"
             continue
 
         if dur_s < _BUMPER_MAX:

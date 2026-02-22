@@ -15,7 +15,16 @@ from bdpl.analyze.segment_graph import (
     find_shared_segments,
 )
 from bdpl.analyze.signatures import compute_signatures, find_duplicates
-from bdpl.model import ClipInfo, DiscAnalysis, Playlist, SpecialFeature, Warning, ticks_to_ms
+from bdpl.model import (
+    ClipInfo,
+    DiscAnalysis,
+    Episode,
+    Playlist,
+    SegmentRef,
+    SpecialFeature,
+    Warning,
+    ticks_to_ms,
+)
 
 log = logging.getLogger(__name__)
 
@@ -263,7 +272,7 @@ def _special_features_from_classifications(
     features: list[SpecialFeature] = []
     idx = 1
 
-    non_episode_cats = {"creditless_op", "creditless_ed", "extra"}
+    non_episode_cats = {"creditless_op", "creditless_ed", "extra", "digital_archive"}
     for mpls, cat in sorted(classifications.items()):
         if cat not in non_episode_cats or mpls in ep_playlists:
             continue
@@ -281,6 +290,83 @@ def _special_features_from_classifications(
         idx += 1
 
     return features
+
+
+def _maybe_keep_single_title_episode(
+    episodes: list[Episode],
+    playlists: list[Playlist],
+    hints: dict,
+    classifications: dict[str, str],
+) -> list[Episode]:
+    """Collapse chapter-split output back to one episode when hints warrant it.
+
+    This addresses discs where one long main feature is chapter-split by
+    heuristics, while disc navigation clearly presents a separate title for
+    digital archive content.
+    """
+    if len(episodes) < 2:
+        return episodes
+
+    episode_playlists = {ep.playlist for ep in episodes}
+    if len(episode_playlists) != 1:
+        return episodes
+    playlist_name = next(iter(episode_playlists))
+
+    try:
+        playlist_num = int(playlist_name.split(".")[0])
+    except (ValueError, IndexError):
+        return episodes
+
+    title_pl = hints.get("title_playlists", {})
+    if not title_pl:
+        return episodes
+
+    titles_for_main = [title for title, pl_nums in title_pl.items() if playlist_num in pl_nums]
+    if len(titles_for_main) != 1:
+        return episodes
+
+    referenced_playlist_nums = {p for pl_nums in title_pl.values() for p in pl_nums}
+    has_archive_title = any(
+        classifications.get(f"{pl_num:05d}.mpls") == "digital_archive"
+        for pl_num in referenced_playlist_nums
+        if pl_num != playlist_num
+    )
+    if not has_archive_title:
+        return episodes
+
+    playlist = next((pl for pl in playlists if pl.mpls == playlist_name), None)
+    if playlist is None:
+        return episodes
+
+    segments = [
+        SegmentRef(
+            key=pi.segment_key(),
+            clip_id=pi.clip_id,
+            in_ms=ticks_to_ms(pi.in_time),
+            out_ms=ticks_to_ms(pi.out_time),
+            duration_ms=pi.duration_ms,
+            label=pi.label,
+        )
+        for pi in playlist.play_items
+    ]
+
+    log.debug(
+        "Collapsing %d inferred episodes into one for %s based on title/archive hints",
+        len(episodes),
+        playlist.mpls,
+    )
+
+    return [
+        Episode(
+            episode=1,
+            playlist=playlist.mpls,
+            duration_ms=playlist.duration_ms,
+            # Higher than chapter-split base (0.6) because title hints
+            # confirm one main feature with a separate archive title.
+            confidence=0.85,
+            segments=segments,
+        )
+    ]
 
 
 def scan_disc(
@@ -345,6 +431,13 @@ def scan_disc(
 
     # 6. Order episodes
     episodes = order_episodes(unique_playlists, play_all)
+
+    episodes = _maybe_keep_single_title_episode(
+        episodes,
+        unique_playlists,
+        hints,
+        classifications,
+    )
 
     # If episodes came from Play All decomposition, reclassify playlists
     # that were marked 'episode' but whose segments aren't in the episode

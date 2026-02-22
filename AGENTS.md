@@ -10,7 +10,7 @@
 bdpl/
 ├── bdpl/
 │   ├── __init__.py          # Package root, version
-│   ├── cli.py               # Typer CLI (scan, explain, playlist, remux)
+│   ├── cli.py               # Typer CLI (scan, explain, playlist, remux, archive)
 │   ├── model.py             # Dataclasses: Playlist, PlayItem, Episode, etc.
 │   ├── bdmv/
 │   │   ├── reader.py        # BinaryReader — big-endian binary parser
@@ -31,7 +31,8 @@ bdpl/
 │   │   ├── json_out.py      # JSON export (disc.json schema v1)
 │   │   ├── text_report.py   # Plain text summary report
 │   │   ├── m3u.py           # M3U debug playlist generation
-│   │   └── mkv_chapters.py  # MKV with chapters + track names (needs mkvmerge)
+│   │   ├── mkv_chapters.py  # MKV with chapters + track names (needs mkvmerge)
+│   │   └── digital_archive.py # Digital archive image extraction (needs ffmpeg)
 │   └── remux/               # (v0.3) mkvmerge/ffmpeg integration
 │       └── __init__.py
 ├── tests/
@@ -42,11 +43,14 @@ bdpl/
 │   ├── test_index_bdmv.py   # index.bdmv parser tests
 │   ├── test_movieobject_bdmv.py # MovieObject.bdmv parser tests
 │   ├── test_ig_stream.py    # IG stream parser tests (ICS fixture)
-│   ├── test_chapter_split.py # Chapter-based episode splitting tests
-│   ├── test_scan.py         # Full scan pipeline integration tests
+│   ├── test_disc1_scan.py   # disc1 integration tests
+│   ├── test_disc2_scan.py   # disc2 chapter-splitting tests
+│   ├── test_disc3_scan.py   # disc3 integration tests
+│   ├── test_disc4_scan.py   # disc4 single-main-title + archive tests
+│   ├── test_digital_archive.py # digital archive detection/extraction tests
 │   └── test_cli.py          # CLI subprocess tests
 ├── pyproject.toml           # Build config, deps (typer, rich, pytest)
-├── PLAN.md                  # Full project roadmap (v0.1–v0.3)
+├── PLAN.md                  # Full project roadmap (v0.1–v0.4)
 └── AGENTS.md                # This file
 ```
 
@@ -90,7 +94,7 @@ These can reveal episode→chapter mappings embedded in the disc menu structure:
 
 ### Python Setup
 ```bash
-# Python 3.12+ required
+# Python 3.10+ required (3.12 recommended)
 pip install -e ".[dev]"
 ```
 
@@ -100,6 +104,7 @@ bdpl scan /path/to/BDMV -o disc.json
 bdpl scan /path/to/BDMV --stdout --pretty
 bdpl explain /path/to/BDMV
 bdpl playlist /path/to/BDMV --out ./Playlists
+bdpl archive /path/to/BDMV --out ./DigitalArchive
 ```
 
 ### Testing
@@ -122,7 +127,7 @@ pytest tests/ -v
 - `DiscAnalysis`: Complete analysis result (playlists, clips, episodes, warnings)
 
 ### JSON Schema (`bdpl.disc.v1`)
-Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, `analysis`
+Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `special_features`, `warnings`, `analysis`
 
 ## Coding Conventions
 - Python 3.10+, use `from __future__ import annotations`
@@ -141,12 +146,14 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `warnings`, 
 - ✅ Full analysis pipeline with navigation hints + IG integration
 - ✅ Episode inference (individual playlists + Play All + chapter splitting)
 - ✅ Special feature detection from IG menu JumpTitle buttons
+- ✅ Digital archive playlist detection (`digital_archive` classification)
 - ✅ JSON export, text reports, M3U playlists
 - ✅ MKV remux with chapters + track names (via mkvmerge)
+- ✅ `archive` extraction command for digital archive still images (via ffmpeg)
 - ✅ `--specials` remux flag for creditless OP/ED, extras, previews
 - ✅ Chapter-based episode splitting with mkvmerge `--split parts:`
-- ✅ Bundled test fixtures (62 tests, no env var needed)
-- ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`
+- ✅ Bundled test fixtures (72 tests, no env var needed)
+- ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`, `archive`
 - ✅ Plex/Jellyfin-compatible default naming (`{name} - S01Exx.mkv`, `{name} - S00Exx - {category}.mkv`)
 
 ## Agent Tips

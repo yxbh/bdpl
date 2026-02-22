@@ -54,3 +54,26 @@ class TestExplainOutput:
         output: str = result.stdout
         assert "Episodes" in output
         assert "Playlists" in output
+
+
+class TestArchiveDryRun:
+    def test_archive_dry_run(self) -> None:
+        """Run `bdpl archive --dry-run` and verify command exits cleanly."""
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            [PYTHON, "-m", "bdpl.cli", "archive", _bdmv(), "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+
+    def test_archive_invalid_format(self) -> None:
+        """Run `bdpl archive --format gif` and verify CLI rejects invalid value."""
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            [PYTHON, "-m", "bdpl.cli", "archive", _bdmv(), "--format", "gif", "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode != 0
+        assert "Invalid value" in result.stderr
