@@ -84,6 +84,12 @@ def disc5_path() -> Path:
 
 
 @pytest.fixture(scope="session")
+def disc6_path() -> Path:
+    """Return path to bundled disc6 fixture."""
+    return _fixture_path("disc6")
+
+
+@pytest.fixture(scope="session")
 def disc1_analysis(disc1_path):
     """Run and cache full analysis for bundled disc1 fixture."""
     return _analyze_fixture(disc1_path)
@@ -111,6 +117,12 @@ def disc4_analysis(disc4_path):
 def disc5_analysis(disc5_path):
     """Run and cache full analysis for the bundled disc5 fixture."""
     return _analyze_fixture(disc5_path)
+
+
+@pytest.fixture(scope="session")
+def disc6_analysis(disc6_path):
+    """Run and cache full analysis for the bundled disc6 fixture."""
+    return _analyze_fixture(disc6_path)
 
 
 @pytest.fixture

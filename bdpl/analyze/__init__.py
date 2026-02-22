@@ -260,7 +260,58 @@ def _detect_special_features(
         )
         idx += 1
 
+    # Supplement direct IG-derived features with title-hint specials when
+    # menus jump via intermediate logic and only expose a subset of targets.
+    title_hint_playlists = _title_hint_non_episode_playlists(hints, classifications, episodes)
+    existing_playlists = {feature.playlist for feature in features}
+    pl_by_name = {pl.mpls: pl for pl in playlists}
+    for mpls in title_hint_playlists:
+        if mpls in existing_playlists:
+            continue
+        pl = pl_by_name.get(mpls)
+        if pl is None:
+            continue
+        category = classifications.get(mpls, "extra")
+        if category in {"episode", "play_all"}:
+            continue
+        features.append(
+            SpecialFeature(
+                index=idx,
+                playlist=mpls,
+                duration_ms=pl.duration_ms,
+                category=category,
+                menu_visible=True,
+            )
+        )
+        idx += 1
+
     return features
+
+
+def _title_hint_non_episode_playlists(
+    hints: dict,
+    classifications: dict[str, str],
+    episodes: list,
+) -> list[str]:
+    """Return ordered playlist names referenced by titles that are not episodes/play_all."""
+    title_pl = hints.get("title_playlists", {})
+    if not title_pl:
+        return []
+
+    ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
+    play_all_set = {mpls for mpls, cat in classifications.items() if cat == "play_all"}
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for title_num, pl_nums in sorted(title_pl.items()):
+        if not pl_nums:
+            continue
+        mpls = f"{pl_nums[0]:05d}.mpls"
+        if mpls in seen or mpls in ep_playlists or mpls in play_all_set:
+            continue
+        ordered.append(mpls)
+        seen.add(mpls)
+    return ordered
 
 
 def _infer_visible_button_count_from_ig(hints: dict) -> int:
@@ -348,6 +399,29 @@ def _special_features_from_classifications(
     pl_by_name = {pl.mpls: pl for pl in playlists}
     features: list[SpecialFeature] = []
     idx = 1
+
+    title_hint_playlists = _title_hint_non_episode_playlists(hints or {}, classifications, episodes)
+    if title_hint_playlists:
+        for mpls in title_hint_playlists:
+            pl = pl_by_name.get(mpls)
+            if pl is None:
+                continue
+            category = classifications.get(mpls, "extra")
+            if category in {"episode", "play_all"}:
+                category = "extra"
+            features.append(
+                SpecialFeature(
+                    index=idx,
+                    playlist=mpls,
+                    duration_ms=pl.duration_ms,
+                    category=category,
+                    menu_visible=True,
+                )
+            )
+            idx += 1
+
+        _apply_menu_visibility_from_hints(features, hints or {})
+        return features
 
     non_episode_cats = {"creditless_op", "creditless_ed", "extra", "digital_archive"}
     for mpls, cat in sorted(classifications.items()):
