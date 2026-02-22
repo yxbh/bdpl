@@ -46,3 +46,24 @@ def test_disc4_detects_digital_archive_playlist(disc4_path: Path) -> None:
 
     classes = analysis.analysis.get("classifications", {})
     assert classes.get("00003.mpls") == "digital_archive"
+
+
+def test_disc4_keeps_single_main_title_when_archive_title_exists(disc4_path: Path) -> None:
+    """Guard against chapter-splitting when hints show one main + archive title."""
+    playlists = parse_mpls_dir(disc4_path / "PLAYLIST")
+    clips = parse_clpi_dir(disc4_path / "CLIPINF")
+    analysis: DiscAnalysis = scan_disc(disc4_path, playlists, clips)
+
+    hints = analysis.analysis.get("disc_hints", {})
+    title_playlists = hints.get("title_playlists", {})
+    classes = analysis.analysis.get("classifications", {})
+
+    assert title_playlists.get(0) == [2]
+    assert title_playlists.get(1) == [3]
+    assert classes.get("00003.mpls") == "digital_archive"
+
+    assert len(analysis.episodes) == 1
+    assert analysis.episodes[0].playlist == "00002.mpls"
+
+    main = next(pl for pl in playlists if pl.mpls == "00002.mpls")
+    assert abs(analysis.episodes[0].duration_ms - main.duration_ms) < 1.0
