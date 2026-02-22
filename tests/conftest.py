@@ -8,7 +8,23 @@ from bdpl.bdmv.clpi import parse_clpi_dir
 from bdpl.bdmv.mpls import parse_mpls_dir
 
 _FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc1"
+_FIXTURES_ROOT: Path = Path(__file__).parent / "fixtures"
 _DISC5_FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc5"
+
+
+def _fixture_path(name: str) -> Path:
+    """Resolve and validate a bundled disc fixture path by name."""
+    path = _FIXTURES_ROOT / name
+    if not (path / "PLAYLIST").is_dir():
+        pytest.skip(f"{name} fixture not available")
+    return path
+
+
+def _analyze_fixture(path: Path):
+    """Parse and analyze one fixture directory."""
+    playlists = parse_mpls_dir(path / "PLAYLIST")
+    clips = parse_clpi_dir(path / "CLIPINF")
+    return scan_disc(path, playlists, clips)
 
 
 @pytest.fixture
@@ -35,11 +51,60 @@ def bdmv_path() -> Path:
 
 
 @pytest.fixture(scope="session")
-def disc5_analysis():
-    """Run and cache full analysis for the bundled disc5 fixture."""
-    if not (_DISC5_FIXTURE_DIR / "PLAYLIST").is_dir():
-        pytest.skip("disc5 fixture not available")
+def disc1_path() -> Path:
+    """Return path to bundled disc1 fixture."""
+    return _fixture_path("disc1")
 
-    playlists = parse_mpls_dir(_DISC5_FIXTURE_DIR / "PLAYLIST")
-    clips = parse_clpi_dir(_DISC5_FIXTURE_DIR / "CLIPINF")
-    return scan_disc(_DISC5_FIXTURE_DIR, playlists, clips)
+
+@pytest.fixture(scope="session")
+def disc2_path() -> Path:
+    """Return path to bundled disc2 fixture."""
+    return _fixture_path("disc2")
+
+
+@pytest.fixture(scope="session")
+def disc3_path() -> Path:
+    """Return path to bundled disc3 fixture."""
+    return _fixture_path("disc3")
+
+
+@pytest.fixture(scope="session")
+def disc4_path() -> Path:
+    """Return path to bundled disc4 fixture."""
+    return _fixture_path("disc4")
+
+
+@pytest.fixture(scope="session")
+def disc5_path() -> Path:
+    """Return path to bundled disc5 fixture."""
+    return _fixture_path("disc5")
+
+
+@pytest.fixture(scope="session")
+def disc1_analysis(disc1_path):
+    """Run and cache full analysis for bundled disc1 fixture."""
+    return _analyze_fixture(disc1_path)
+
+
+@pytest.fixture(scope="session")
+def disc2_analysis(disc2_path):
+    """Run and cache full analysis for bundled disc2 fixture."""
+    return _analyze_fixture(disc2_path)
+
+
+@pytest.fixture(scope="session")
+def disc3_analysis(disc3_path):
+    """Run and cache full analysis for bundled disc3 fixture."""
+    return _analyze_fixture(disc3_path)
+
+
+@pytest.fixture(scope="session")
+def disc4_analysis(disc4_path):
+    """Run and cache full analysis for bundled disc4 fixture."""
+    return _analyze_fixture(disc4_path)
+
+
+@pytest.fixture(scope="session")
+def disc5_analysis(disc5_path):
+    """Run and cache full analysis for the bundled disc5 fixture."""
+    return _analyze_fixture(disc5_path)
