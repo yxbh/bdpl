@@ -415,7 +415,7 @@ Use `rich` tables optionally for readability.
 - [x] `archive` CLI command for still-image extraction via ffmpeg
 - [x] Disc4 fixture and integration tests for single-main-title + digital archive behavior
 - [ ] `util/hashing.py` — disc fingerprint (hash of playlist filenames + sizes)
-- [ ] `CONTRIBUTING.md`
+- [x] `CONTRIBUTING.md`
 
 ### Later / Optional
 - UI/interactive TUI for resolving ambiguous cases
@@ -434,8 +434,8 @@ Use `rich` tables optionally for readability.
 ## 12. Licensing & Contribution Notes
 - [x] MIT license
 - [x] Do not include copyrighted streams in repo
-- [ ] Provide "how to capture metadata-only fixtures" instructions for contributors
-- [ ] Add `CONTRIBUTING.md` with:
+- [x] Provide "how to capture metadata-only fixtures" instructions for contributors
+- [x] Add `CONTRIBUTING.md` with:
   - how to run tests
   - how to add new fixtures safely
   - how to report discs that fail (share only MPLS/CLPI + scan output)
@@ -475,4 +475,4 @@ Files implemented:
 
 Remaining work:
 - v0.3: `--prefer-audio`/`--prefer-subs`, `remux_plan.json`, `remux/ffmpeg.py`
-- v0.4: `util/hashing.py`, `CONTRIBUTING.md`
+- v0.4: `util/hashing.py`
