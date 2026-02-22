@@ -68,6 +68,18 @@ def analysis_to_dict(analysis: DiscAnalysis) -> dict:
                     "label": seg.label,
                 }
             )
+        scenes = []
+        for scene in ep.scenes:
+            scenes.append(
+                {
+                    "key": list(scene.key),
+                    "clip_id": scene.clip_id,
+                    "in_ms": scene.in_ms,
+                    "out_ms": scene.out_ms,
+                    "duration_ms": scene.duration_ms,
+                    "label": scene.label,
+                }
+            )
         episodes.append(
             {
                 "episode": ep.episode,
@@ -75,6 +87,7 @@ def analysis_to_dict(analysis: DiscAnalysis) -> dict:
                 "duration_ms": ep.duration_ms,
                 "confidence": ep.confidence,
                 "segments": segments,
+                "scenes": scenes,
             }
         )
 

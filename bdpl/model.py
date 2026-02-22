@@ -107,6 +107,7 @@ class Episode:
     duration_ms: float
     confidence: float
     segments: list[SegmentRef]
+    scenes: list[SegmentRef] = field(default_factory=list)
     alternates: list[str] = field(default_factory=list)
 
 

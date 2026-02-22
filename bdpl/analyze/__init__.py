@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from pathlib import Path
 
 from bdpl.analyze.classify import classify_playlists, label_segments
@@ -260,7 +261,58 @@ def _detect_special_features(
         )
         idx += 1
 
+    # Supplement direct IG-derived features with title-hint specials when
+    # menus jump via intermediate logic and only expose a subset of targets.
+    title_hint_playlists = _title_hint_non_episode_playlists(hints, classifications, episodes)
+    existing_playlists = {feature.playlist for feature in features}
+    pl_by_name = {pl.mpls: pl for pl in playlists}
+    for mpls in title_hint_playlists:
+        if mpls in existing_playlists:
+            continue
+        pl = pl_by_name.get(mpls)
+        if pl is None:
+            continue
+        category = classifications.get(mpls, "extra")
+        if category in {"episode", "play_all"}:
+            continue
+        features.append(
+            SpecialFeature(
+                index=idx,
+                playlist=mpls,
+                duration_ms=pl.duration_ms,
+                category=category,
+                menu_visible=True,
+            )
+        )
+        idx += 1
+
     return features
+
+
+def _title_hint_non_episode_playlists(
+    hints: dict,
+    classifications: dict[str, str],
+    episodes: list,
+) -> list[str]:
+    """Return ordered playlist names referenced by titles that are not episodes/play_all."""
+    title_pl = hints.get("title_playlists", {})
+    if not title_pl:
+        return []
+
+    ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
+    play_all_set = {mpls for mpls, cat in classifications.items() if cat == "play_all"}
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for title_num, pl_nums in sorted(title_pl.items()):
+        if not pl_nums:
+            continue
+        mpls = f"{pl_nums[0]:05d}.mpls"
+        if mpls in seen or mpls in ep_playlists or mpls in play_all_set:
+            continue
+        ordered.append(mpls)
+        seen.add(mpls)
+    return ordered
 
 
 def _infer_visible_button_count_from_ig(hints: dict) -> int:
@@ -349,6 +401,29 @@ def _special_features_from_classifications(
     features: list[SpecialFeature] = []
     idx = 1
 
+    title_hint_playlists = _title_hint_non_episode_playlists(hints or {}, classifications, episodes)
+    if title_hint_playlists:
+        for mpls in title_hint_playlists:
+            pl = pl_by_name.get(mpls)
+            if pl is None:
+                continue
+            category = classifications.get(mpls, "extra")
+            if category in {"episode", "play_all"}:
+                category = "extra"
+            features.append(
+                SpecialFeature(
+                    index=idx,
+                    playlist=mpls,
+                    duration_ms=pl.duration_ms,
+                    category=category,
+                    menu_visible=True,
+                )
+            )
+            idx += 1
+
+        _apply_menu_visibility_from_hints(features, hints or {})
+        return features
+
     non_episode_cats = {"creditless_op", "creditless_ed", "extra", "digital_archive"}
     for mpls, cat in sorted(classifications.items()):
         if cat not in non_episode_cats or mpls in ep_playlists:
@@ -370,6 +445,173 @@ def _special_features_from_classifications(
     _apply_menu_visibility_from_hints(features, hints or {})
 
     return features
+
+
+def _downsample_scene_starts(starts_ms: list[float], target_count: int = 4) -> list[float]:
+    """Downsample sorted scene starts to at most ``target_count`` anchors."""
+    if len(starts_ms) <= target_count:
+        return starts_ms
+    if target_count <= 1:
+        return [starts_ms[0]]
+
+    last = len(starts_ms) - 1
+    indices = {round(i * last / (target_count - 1)) for i in range(target_count)}
+    return [starts_ms[i] for i in sorted(indices)]
+
+
+def _sanitize_scene_starts(
+    starts_ms: list[float],
+    duration_ms: float,
+    *,
+    target_count: int = 4,
+    min_tail_ms: float = 120_000,
+) -> list[float]:
+    """Normalize raw scene start anchors and avoid terminal end-mark artifacts."""
+    starts = sorted({start for start in starts_ms if 0 <= start < duration_ms})
+    if not starts:
+        return []
+
+    # Some playlists contain a final chapter marker ~end_of_episode; keep it
+    # out of scene starts when enough earlier anchors are available.
+    trimmed = [start for start in starts if start <= duration_ms - min_tail_ms]
+    if len(trimmed) >= target_count:
+        return trimmed
+
+    return starts
+
+
+def _scene_mark_indices_from_ig(hints: dict) -> dict[str, list[int]]:
+    """Collect chapter-mark indices from IG button hints by target playlist."""
+    ig_hints_raw = hints.get("ig_hints_raw", [])
+    title_pl = hints.get("title_playlists", {})
+    if not ig_hints_raw or not title_pl:
+        return {}
+
+    title_to_mpls: dict[int, str] = {}
+    for title_num, pl_nums in title_pl.items():
+        if pl_nums:
+            title_to_mpls[title_num] = f"{pl_nums[0]:05d}.mpls"
+
+    result: dict[str, list[int]] = defaultdict(list)
+    for hint in ig_hints_raw:
+        if hint.jump_title is None or 2 not in hint.register_sets:
+            continue
+        title_idx = hint.jump_title - 1
+        mpls = title_to_mpls.get(title_idx)
+        if mpls is None:
+            continue
+        mark_idx = hint.register_sets[2]
+        if mark_idx >= 0:
+            result[mpls].append(mark_idx)
+
+    return {mpls: sorted(set(indices)) for mpls, indices in result.items() if indices}
+
+
+def _build_episode_scenes(episodes: list[Episode], playlists: list[Playlist], hints: dict) -> None:
+    """Populate ``Episode.scenes`` from menu chapter marks and chapter metadata.
+
+    Primary source is IG chapter-button marks (register 2 values). When unavailable,
+    fallback is playlist chapter anchors, downsampled to four scene entries.
+    """
+    if not episodes:
+        return
+
+    pl_by_name = {playlist.mpls: playlist for playlist in playlists}
+    mark_map = _scene_mark_indices_from_ig(hints)
+
+    episode_by_playlist = {episode.playlist: episode for episode in episodes}
+    episode_by_clip: dict[str, Episode] = {}
+    for episode in episodes:
+        if episode.segments:
+            episode_by_clip[episode.segments[0].clip_id] = episode
+
+    starts_by_episode: dict[str, list[float]] = defaultdict(list)
+
+    # Direct episode-targeted IG marks
+    for mpls, indices in mark_map.items():
+        episode = episode_by_playlist.get(mpls)
+        playlist = pl_by_name.get(mpls)
+        if episode is None or playlist is None or not playlist.chapters or not playlist.play_items:
+            continue
+        base_in = playlist.play_items[0].in_time
+        for index in indices:
+            if index < 0 or index >= len(playlist.chapters):
+                continue
+            chapter = playlist.chapters[index]
+            local_ms = ticks_to_ms(chapter.timestamp - base_in)
+            if 0 <= local_ms < episode.duration_ms:
+                starts_by_episode[episode.playlist].append(local_ms)
+
+    # Play-all-targeted IG marks mapped to episodes by chapter play_item_ref clip
+    for mpls, indices in mark_map.items():
+        play_all = pl_by_name.get(mpls)
+        if play_all is None or not play_all.chapters or not play_all.play_items:
+            continue
+        for index in indices:
+            if index < 0 or index >= len(play_all.chapters):
+                continue
+            chapter = play_all.chapters[index]
+            if chapter.play_item_ref < 0 or chapter.play_item_ref >= len(play_all.play_items):
+                continue
+            play_item = play_all.play_items[chapter.play_item_ref]
+            episode = episode_by_clip.get(play_item.clip_id)
+            if episode is None:
+                continue
+
+            ep_playlist = pl_by_name.get(episode.playlist)
+            if ep_playlist is None or not ep_playlist.play_items:
+                continue
+            ep_base_in = ep_playlist.play_items[0].in_time
+            local_ms = ticks_to_ms(chapter.timestamp - ep_base_in)
+            if 0 <= local_ms < episode.duration_ms:
+                starts_by_episode[episode.playlist].append(local_ms)
+
+    for episode in episodes:
+        playlist = pl_by_name.get(episode.playlist)
+        if playlist is None or not playlist.play_items:
+            continue
+
+        starts = sorted(set(starts_by_episode.get(episode.playlist, [])))
+        if not starts:
+            base_in = playlist.play_items[0].in_time
+            starts = [
+                ticks_to_ms(chapter.timestamp - base_in)
+                for chapter in playlist.chapters
+                if 0 <= ticks_to_ms(chapter.timestamp - base_in) < episode.duration_ms
+            ]
+            starts = sorted(set(starts))
+
+        starts = _sanitize_scene_starts(starts, episode.duration_ms, target_count=4)
+        starts = _downsample_scene_starts(starts, target_count=4)
+
+        if not starts:
+            starts = [0.0]
+
+        # Ensure first scene starts at episode start.
+        if starts[0] > 250.0:
+            starts = [0.0, *starts]
+            starts = _downsample_scene_starts(sorted(set(starts)), target_count=4)
+
+        clip_id = (
+            episode.segments[0].clip_id if episode.segments else playlist.play_items[0].clip_id
+        )
+        scene_segments: list[SegmentRef] = []
+        for idx, start_ms in enumerate(starts):
+            end_ms = starts[idx + 1] if idx + 1 < len(starts) else episode.duration_ms
+            if end_ms <= start_ms:
+                continue
+            scene_segments.append(
+                SegmentRef(
+                    key=("SCENE", episode.playlist, idx + 1),
+                    clip_id=clip_id,
+                    in_ms=start_ms,
+                    out_ms=end_ms,
+                    duration_ms=end_ms - start_ms,
+                    label="SCENE",
+                )
+            )
+
+        episode.scenes = scene_segments
 
 
 def _maybe_keep_single_title_episode(
@@ -600,6 +842,9 @@ def scan_disc(
         playlists,
         episodes,
     )
+
+    # 9. Build scene-level episode segments from menu/chapter markers.
+    _build_episode_scenes(episodes, unique_playlists, hints)
 
     return DiscAnalysis(
         path=str(bdmv_path),

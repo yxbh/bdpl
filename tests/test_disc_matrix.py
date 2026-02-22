@@ -17,6 +17,7 @@ pytestmark = pytest.mark.integration
         ("disc3_analysis", 4, ["00002.mpls", "00002.mpls", "00002.mpls", "00002.mpls"]),
         ("disc4_analysis", 1, ["00002.mpls"]),
         ("disc5_analysis", 1, ["00001.mpls"]),
+        ("disc6_analysis", 2, ["00003.mpls", "00005.mpls"]),
     ],
 )
 def test_disc_episode_expectation_matrix(
@@ -36,6 +37,7 @@ def test_disc_episode_expectation_matrix(
     ("analysis_fixture", "expected_total", "expected_visible"),
     [
         ("disc5_analysis", 14, 11),
+        ("disc6_analysis", 3, 3),
     ],
 )
 def test_disc_special_visibility_expectation_matrix(
