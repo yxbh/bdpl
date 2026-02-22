@@ -2,8 +2,12 @@
 
 import json
 
+import pytest
+
 from bdpl.export import export_json
 from bdpl.model import DiscAnalysis
+
+pytestmark = pytest.mark.integration
 
 
 class TestScanFindsEpisodes:

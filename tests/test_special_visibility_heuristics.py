@@ -1,12 +1,12 @@
 """Unit tests for special-feature visibility fallback heuristics."""
 
 from bdpl.analyze.__init__ import _is_likely_menu_visible_special
-from bdpl.model import SpecialFeature
+from tests.builders import build_special_feature
 
 
-def _feature(playlist: str, duration_ms: float) -> SpecialFeature:
+def _feature(playlist: str, duration_ms: float):
     """Build a minimal SpecialFeature for heuristic tests."""
-    return SpecialFeature(
+    return build_special_feature(
         index=1,
         playlist=playlist,
         duration_ms=duration_ms,

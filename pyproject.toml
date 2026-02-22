@@ -25,6 +25,10 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "unit: fast unit tests",
+    "integration: fixture-backed integration tests",
+]
 
 [tool.ruff]
 line-length = 100
