@@ -1,6 +1,6 @@
 # bdpl — Project Plan (Python)
 
-Version: v0.1 → v0.3 roadmap  
+Version: v0.1 → v0.4 roadmap  
 Goal: Given a Blu-ray `BDMV/` folder (full disc backup), automatically identify *episode playlists* and map **Episode → ordered media segments**, then optionally remux to **one MKV per episode** and/or generate debug playlists.
 
 ---
@@ -87,6 +87,20 @@ Notes:
 - Intended for debugging; seamless joins depend on player/codec continuity
 - “Real” consumption is via remux
 
+#### `bdpl archive`
+Extract still images from digital archive playlists (menu/gallery content).
+
+```bash
+bdpl archive /path/to/BDMV --out ./DigitalArchive
+bdpl archive /path/to/BDMV --format png
+bdpl archive /path/to/BDMV --dry-run
+```
+
+Behavior:
+- Detects playlists classified as `digital_archive`
+- Captures one frame per archive item via `ffmpeg`
+- Writes deterministic names: `{playlist}-{index}-{clip_id}.{ext}`
+
 ---
 
 ## 3. Outputs and Data Model
@@ -101,6 +115,7 @@ Top-level:
   - `generated_at`
 - `playlists`: list of all playlists parsed
 - `episodes`: inferred ordered episodes (may be empty if not confident)
+- `special_features`: inferred non-episode features (creditless OP/ED, extras, digital archives)
 - `analysis`: cluster and shared-segment stats
 - `warnings`: list of warning objects
 
@@ -172,15 +187,14 @@ bdpl/
       json_out.py
       text_report.py
       m3u.py
+      digital_archive.py
+      mkv_chapters.py
     remux/
       __init__.py
-      mkvmerge.py
-      ffmpeg.py             # optional alternative
-      naming.py
+      # remux CLI integration currently lives in export/mkv_chapters.py
     util/
       __init__.py
-      hashing.py
-      log.py
+      # hashing/log helpers planned
   tests/
     test_reader.py
     test_mpls_parse_minimal.py
@@ -397,6 +411,9 @@ Use `rich` tables optionally for readability.
 - [x] Chapter-based episode splitting for single-m2ts discs
 - [x] Remux `--split parts:` for chapter-split episodes
 - [x] Disc hints displayed in `explain` output
+- [x] Digital archive playlist detection (`digital_archive` classification)
+- [x] `archive` CLI command for still-image extraction via ffmpeg
+- [x] Disc4 fixture and integration tests for single-main-title + digital archive behavior
 - [ ] `util/hashing.py` — disc fingerprint (hash of playlist filenames + sizes)
 - [ ] `CONTRIBUTING.md`
 
@@ -427,10 +444,10 @@ Use `rich` tables optionally for readability.
 
 ## 13. Implementation Status
 
-Updated 2026-02-09. v0.1 + v0.2 complete. v0.3 mostly complete. v0.4 mostly complete. 62 tests passing.
+Updated 2026-02-22. v0.1 + v0.2 complete. v0.3 mostly complete. v0.4 mostly complete. 72 tests passing.
 
 Files implemented:
-- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` with `--specials`)
+- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` with `--specials`, `archive`)
 - `bdpl/model.py` — Dataclasses (Playlist, PlayItem, Episode, SpecialFeature, DiscAnalysis, etc.)
 - `bdpl/bdmv/reader.py` — Big-endian BinaryReader with zero-copy slicing
 - `bdpl/bdmv/mpls.py` — MPLS parser (play items, chapters, STN streams)
@@ -448,10 +465,13 @@ Files implemented:
 - `bdpl/export/json_out.py` — JSON export (`bdpl.disc.v1` schema) with special features
 - `bdpl/export/text_report.py` — Plain text summary report with disc hints + special features section
 - `bdpl/export/m3u.py` — M3U debug playlist generation
+- `bdpl/export/digital_archive.py` — digital archive extraction planning + ffmpeg image export
 - `bdpl/export/mkv_chapters.py` — MKV remux with chapters + track names + `--split parts:` for chapter splits + `--specials` for special features
-- `tests/` — 62 tests (reader, mpls, clpi, index, movieobject, ig_stream, chapter_split, scan, CLI)
+- `tests/` — 72 tests (reader, mpls, clpi, index, movieobject, ig_stream, chapter_split, scan, disc-specific integration, CLI, digital archive)
 - `tests/fixtures/disc1/` — Bundled MPLS/CLPI/index/MovieObject from multi-episode disc
 - `tests/fixtures/disc2/` — Bundled metadata + ICS fixture from single-m2ts chapter-split disc
+- `tests/fixtures/disc3/` — Bundled metadata fixture with 4 inferred episodes
+- `tests/fixtures/disc4/` — Bundled metadata fixture for single 44:03 main title + digital archive menu gallery
 
 Remaining work:
 - v0.3: `--prefer-audio`/`--prefer-subs`, `remux_plan.json`, `remux/ffmpeg.py`
