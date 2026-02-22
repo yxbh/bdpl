@@ -145,6 +145,11 @@ def remux(
         help="Output filename pattern ({name}=disc folder, {ep}=episode number)",
     ),
     specials: bool = typer.Option(False, "--specials", help="Also remux special features"),
+    visible_only: bool = typer.Option(
+        False,
+        "--visible-only",
+        help="With --specials, include only menu-visible specials",
+    ),
     specials_pattern: str = typer.Option(
         "{name} - S00E{idx:02d} - {category}.mkv",
         "--specials-pattern",
@@ -179,7 +184,12 @@ def remux(
             for line in plan["chapters_xml"].splitlines()[:15]:
                 console.print(f"    {line}")
         if specials:
-            sf_plans = get_specials_dry_run(analysis, out, pattern=specials_pattern)
+            sf_plans = get_specials_dry_run(
+                analysis,
+                out,
+                pattern=specials_pattern,
+                visible_only=visible_only,
+            )
             for plan in sf_plans:
                 console.print(
                     f"\n[bold]Special {plan['index']} ({plan['category']})[/bold]"
@@ -231,6 +241,7 @@ def remux(
                     mkvmerge_path=mkvmerge_path,
                     on_progress=_on_sf_progress,
                     pattern=specials_pattern,
+                    visible_only=visible_only,
                 )
                 created.extend(sf_created)
 
@@ -251,6 +262,11 @@ def archive_cmd(
     out: str = typer.Option("./DigitalArchive", "--out", help="Output directory for images"),
     image_format: ImageFormat = typer.Option(ImageFormat.jpg, "--format", help="Image format"),
     ffmpeg_path: str = typer.Option(None, "--ffmpeg-path", help="Path to ffmpeg executable"),
+    visible_only: bool = typer.Option(
+        False,
+        "--visible-only",
+        help="Extract only menu-visible digital archive playlists when visibility is known",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print commands without executing"),
 ):
     """Extract digital-archive images (menu stills) as files.
@@ -268,6 +284,7 @@ def archive_cmd(
                 out,
                 ffmpeg_path=ffmpeg_path,
                 image_format=image_fmt,
+                visible_only=visible_only,
             )
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
@@ -290,6 +307,7 @@ def archive_cmd(
             out,
             ffmpeg_path=ffmpeg_path,
             image_format=image_fmt,
+            visible_only=visible_only,
         )
     except (RuntimeError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")

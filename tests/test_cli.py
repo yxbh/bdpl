@@ -77,3 +77,34 @@ class TestArchiveDryRun:
         )
         assert result.returncode != 0
         assert "Invalid value" in result.stderr
+
+    def test_archive_visible_only_dry_run(self) -> None:
+        """Run `bdpl archive --visible-only --dry-run` and verify it exits cleanly."""
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            [PYTHON, "-m", "bdpl.cli", "archive", _bdmv(), "--visible-only", "--dry-run"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+
+
+class TestRemuxDryRun:
+    def test_remux_specials_visible_only_dry_run(self) -> None:
+        """Run `bdpl remux --specials --visible-only --dry-run` and verify it succeeds."""
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            [
+                PYTHON,
+                "-m",
+                "bdpl.cli",
+                "remux",
+                _bdmv(),
+                "--specials",
+                "--visible-only",
+                "--dry-run",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"

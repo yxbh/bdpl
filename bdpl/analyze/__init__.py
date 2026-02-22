@@ -175,6 +175,7 @@ def _detect_special_features(
             classifications,
             playlists,
             episodes,
+            hints,
         )
 
     # Build set of episode playlists to exclude
@@ -254,6 +255,7 @@ def _detect_special_features(
                 duration_ms=dur_ms,
                 category=category,
                 chapter_start=ch_start,
+                menu_visible=True,
             )
         )
         idx += 1
@@ -261,10 +263,85 @@ def _detect_special_features(
     return features
 
 
+def _infer_visible_button_count_from_ig(hints: dict) -> int:
+    """Infer visible content-button count from IG button hints.
+
+    Chapter menus typically set register 2 before JumpTitle. Buttons that
+    JumpTitle without setting register 2 are treated as visible content items.
+    """
+    ig_hints_raw = hints.get("ig_hints_raw", [])
+    if not ig_hints_raw:
+        return 0
+
+    visible_buttons: set[tuple[int, int]] = set()
+    for hint in ig_hints_raw:
+        if hint.jump_title is None:
+            continue
+        if 2 in hint.register_sets:
+            continue
+        if hint.button_id <= 0:
+            continue
+        visible_buttons.add((hint.page_id, hint.button_id))
+    return len(visible_buttons)
+
+
+def _special_visibility_score(feature: SpecialFeature) -> tuple[int, int, float]:
+    """Return ranking key for likely menu-visible special features."""
+    try:
+        playlist_num = int(feature.playlist.split(".")[0])
+    except (ValueError, IndexError):
+        playlist_num = 99999
+
+    score = 0
+    if playlist_num < 1000:
+        score += 2
+    if feature.duration_ms >= 15_000:
+        score += 1
+    return (score, -playlist_num, feature.duration_ms)
+
+
+def _is_likely_menu_visible_special(feature: SpecialFeature) -> bool:
+    """Fallback visibility heuristic when no IG button evidence exists."""
+    try:
+        playlist_num = int(feature.playlist.split(".")[0])
+    except (ValueError, IndexError):
+        return False
+    if playlist_num >= 1000:
+        return False
+    return feature.duration_ms >= 15_000
+
+
+def _apply_menu_visibility_from_hints(features: list[SpecialFeature], hints: dict) -> None:
+    """Mark each SpecialFeature as menu-visible or not, in-place."""
+    if not features:
+        return
+
+    visible_count = _infer_visible_button_count_from_ig(hints)
+    if visible_count <= 0:
+        for feature in features:
+            feature.menu_visible = _is_likely_menu_visible_special(feature)
+        return
+
+    # Best effort: IG-derived count approximates number of visible content
+    # entries, then ranking chooses the most likely visible features.
+    ranked = sorted(features, key=_special_visibility_score, reverse=True)
+    visible_keys = {
+        (feature.playlist, feature.chapter_start, feature.index)
+        for feature in ranked[:visible_count]
+    }
+    for feature in features:
+        feature.menu_visible = (
+            feature.playlist,
+            feature.chapter_start,
+            feature.index,
+        ) in visible_keys
+
+
 def _special_features_from_classifications(
     classifications: dict[str, str],
     playlists: list[Playlist],
     episodes: list,
+    hints: dict | None = None,
 ) -> list[SpecialFeature]:
     """Fallback: build special features list from playlist classifications."""
     ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
@@ -285,9 +362,12 @@ def _special_features_from_classifications(
                 playlist=mpls,
                 duration_ms=pl.duration_ms,
                 category=cat,
+                menu_visible=True,
             )
         )
         idx += 1
+
+    _apply_menu_visibility_from_hints(features, hints or {})
 
     return features
 
@@ -430,7 +510,7 @@ def scan_disc(
     analysis["classifications"] = classifications
 
     # 6. Order episodes
-    episodes = order_episodes(unique_playlists, play_all)
+    episodes = order_episodes(unique_playlists, play_all, classifications)
 
     episodes = _maybe_keep_single_title_episode(
         episodes,

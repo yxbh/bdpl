@@ -63,14 +63,18 @@ def text_report(analysis: DiscAnalysis) -> str:
 
     # Special Features
     if analysis.special_features:
+        visible_count = sum(1 for sf in analysis.special_features if sf.menu_visible)
         lines.append("-" * 60)
-        lines.append(f"Special Features ({len(analysis.special_features)})")
+        lines.append(
+            f"Special Features ({len(analysis.special_features)} total, {visible_count} visible)"
+        )
         lines.append("-" * 60)
         for sf in analysis.special_features:
             ch_str = f"  ch.{sf.chapter_start}" if sf.chapter_start is not None else ""
+            vis_str = "visible" if sf.menu_visible else "hidden"
             lines.append(
                 f"  {sf.index:>2}. {sf.playlist}{ch_str}"
-                f"  {format_duration(sf.duration_ms):>10}  {sf.category}"
+                f"  {format_duration(sf.duration_ms):>10}  {sf.category}  [{vis_str}]"
             )
         lines.append("")
 

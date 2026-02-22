@@ -35,14 +35,22 @@ def _find_ffmpeg() -> str | None:
     return None
 
 
-def _digital_archive_playlists(analysis: DiscAnalysis) -> list[Playlist]:
+def _digital_archive_playlists(
+    analysis: DiscAnalysis,
+    visible_only: bool = False,
+) -> list[Playlist]:
     """Return playlists classified as digital archives, preserving stable order."""
     pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
     names: list[str] = []
+    visible_sf_names: set[str] = set()
+    has_archive_visibility = False
 
     for sf in analysis.special_features:
         if sf.category == "digital_archive":
+            has_archive_visibility = True
             names.append(sf.playlist)
+            if sf.menu_visible:
+                visible_sf_names.add(sf.playlist)
 
     classifications = analysis.analysis.get("classifications", {})
     for name, category in sorted(classifications.items()):
@@ -55,16 +63,21 @@ def _digital_archive_playlists(analysis: DiscAnalysis) -> list[Playlist]:
         if name in seen:
             continue
         seen.add(name)
+        if visible_only and has_archive_visibility and name not in visible_sf_names:
+            continue
         pl = pl_by_name.get(name)
         if pl is not None:
             result.append(pl)
     return result
 
 
-def collect_archive_items(analysis: DiscAnalysis) -> list[ArchiveItem]:
+def collect_archive_items(
+    analysis: DiscAnalysis,
+    visible_only: bool = False,
+) -> list[ArchiveItem]:
     """Collect extractable archive items from digital archive playlists."""
     items: list[ArchiveItem] = []
-    for pl in _digital_archive_playlists(analysis):
+    for pl in _digital_archive_playlists(analysis, visible_only=visible_only):
         for idx, pi in enumerate(pl.play_items, start=1):
             items.append(_to_archive_item(pl, pi, idx))
     return items
@@ -140,6 +153,7 @@ def get_digital_archive_dry_run(
     stream_dir: str | Path | None = None,
     ffmpeg_path: str | None = None,
     image_format: str = "jpg",
+    visible_only: bool = False,
 ) -> list[dict]:
     """Return the ffmpeg commands that would be run for archive extraction."""
     fmt = _validate_image_format(image_format)
@@ -151,7 +165,7 @@ def get_digital_archive_dry_run(
 
     ffmpeg = ffmpeg_path or "ffmpeg"
     result: list[dict] = []
-    for item in collect_archive_items(analysis):
+    for item in collect_archive_items(analysis, visible_only=visible_only):
         source = stream / f"{item.clip_id}.m2ts"
         output = _resolve_output_path(out, item, fmt)
         cmd = _build_ffmpeg_cmd(ffmpeg, source, output, item.in_ms, fmt)
@@ -173,13 +187,14 @@ def export_digital_archive_images(
     stream_dir: str | Path | None = None,
     ffmpeg_path: str | None = None,
     image_format: str = "jpg",
+    visible_only: bool = False,
 ) -> list[Path]:
     """Extract one still image for each digital archive entry.
 
     Uses ffmpeg to grab one frame at each play item in-time.
     """
     fmt = _validate_image_format(image_format)
-    items = collect_archive_items(analysis)
+    items = collect_archive_items(analysis, visible_only=visible_only)
     if not items:
         return []
 
