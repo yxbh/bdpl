@@ -1,6 +1,10 @@
 """Tests for chapter-based episode splitting (disc2 fixture)."""
 
+import pytest
+
 from bdpl.model import DiscAnalysis
+
+pytestmark = pytest.mark.integration
 
 
 class TestChapterSplitting:

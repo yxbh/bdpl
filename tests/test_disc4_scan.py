@@ -1,7 +1,11 @@
 """Integration tests for the disc4 fixture scan results."""
 
+import pytest
+
 from bdpl.analyze.__init__ import _maybe_keep_single_title_episode
 from bdpl.model import DiscAnalysis, Episode, SegmentRef
+
+pytestmark = pytest.mark.integration
 
 
 def test_disc4_finds_one_episode(disc4_analysis: DiscAnalysis) -> None:

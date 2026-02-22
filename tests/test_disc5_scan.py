@@ -1,6 +1,10 @@
 """Integration tests for disc5 fixture scan behavior."""
 
+import pytest
+
 from bdpl.model import DiscAnalysis
+
+pytestmark = pytest.mark.integration
 
 
 def test_disc5_finds_single_main_episode(disc5_analysis: DiscAnalysis) -> None:

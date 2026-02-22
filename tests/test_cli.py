@@ -1,39 +1,23 @@
 """Tests for CLI commands via subprocess."""
 
 import json
-import os
 import subprocess
-import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-PYTHON: str = sys.executable
-_FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc1"
-
-
-def _bdmv() -> str:
-    """Resolve BDMV path from env var or bundled fixtures."""
-    env: str | None = os.environ.get("BDPL_TEST_BDMV")
-    if env:
-        p = Path(env)
-        if (p / "BDMV" / "PLAYLIST").is_dir():
-            return str(p / "BDMV")
-        return str(p)
-    if (_FIXTURE_DIR / "PLAYLIST").is_dir():
-        return str(_FIXTURE_DIR)
-    pytest.skip("No BDMV fixtures available")
+pytestmark = pytest.mark.integration
 
 
 class TestScanStdout:
-    def test_scan_stdout(self) -> None:
+    def test_scan_stdout(
+        self,
+        bdmv_path: Path,
+        cli_runner: Callable[..., subprocess.CompletedProcess[str]],
+    ) -> None:
         """Run `bdpl scan --stdout` and verify JSON output."""
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [PYTHON, "-m", "bdpl.cli", "scan", _bdmv(), "--stdout"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        result = cli_runner("scan", str(bdmv_path), "--stdout")
         assert result.returncode == 0, f"stderr: {result.stderr}"
         data = json.loads(result.stdout)
         assert "episodes" in data
@@ -42,14 +26,13 @@ class TestScanStdout:
 
 
 class TestExplainOutput:
-    def test_explain_output(self) -> None:
+    def test_explain_output(
+        self,
+        bdmv_path: Path,
+        cli_runner: Callable[..., subprocess.CompletedProcess[str]],
+    ) -> None:
         """Run `bdpl explain` and verify text output contains expected sections."""
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [PYTHON, "-m", "bdpl.cli", "explain", _bdmv()],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        result = cli_runner("explain", str(bdmv_path))
         assert result.returncode == 0, f"stderr: {result.stderr}"
         output: str = result.stdout
         assert "Episodes" in output
@@ -57,54 +40,53 @@ class TestExplainOutput:
 
 
 class TestArchiveDryRun:
-    def test_archive_dry_run(self) -> None:
+    def test_archive_dry_run(
+        self,
+        bdmv_path: Path,
+        cli_runner: Callable[..., subprocess.CompletedProcess[str]],
+    ) -> None:
         """Run `bdpl archive --dry-run` and verify command exits cleanly."""
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [PYTHON, "-m", "bdpl.cli", "archive", _bdmv(), "--dry-run"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        result = cli_runner("archive", str(bdmv_path), "--dry-run")
         assert result.returncode == 0, f"stderr: {result.stderr}"
 
-    def test_archive_invalid_format(self) -> None:
+    def test_archive_invalid_format(
+        self,
+        bdmv_path: Path,
+        cli_runner: Callable[..., subprocess.CompletedProcess[str]],
+    ) -> None:
         """Run `bdpl archive --format gif` and verify CLI rejects invalid value."""
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [PYTHON, "-m", "bdpl.cli", "archive", _bdmv(), "--format", "gif", "--dry-run"],
-            capture_output=True,
-            text=True,
-            timeout=60,
+        result = cli_runner(
+            "archive",
+            str(bdmv_path),
+            "--format",
+            "gif",
+            "--dry-run",
         )
         assert result.returncode != 0
         assert "Invalid value" in result.stderr
 
-    def test_archive_visible_only_dry_run(self) -> None:
+    def test_archive_visible_only_dry_run(
+        self,
+        bdmv_path: Path,
+        cli_runner: Callable[..., subprocess.CompletedProcess[str]],
+    ) -> None:
         """Run `bdpl archive --visible-only --dry-run` and verify it exits cleanly."""
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [PYTHON, "-m", "bdpl.cli", "archive", _bdmv(), "--visible-only", "--dry-run"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        result = cli_runner("archive", str(bdmv_path), "--visible-only", "--dry-run")
         assert result.returncode == 0, f"stderr: {result.stderr}"
 
 
 class TestRemuxDryRun:
-    def test_remux_specials_visible_only_dry_run(self) -> None:
+    def test_remux_specials_visible_only_dry_run(
+        self,
+        bdmv_path: Path,
+        cli_runner: Callable[..., subprocess.CompletedProcess[str]],
+    ) -> None:
         """Run `bdpl remux --specials --visible-only --dry-run` and verify it succeeds."""
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [
-                PYTHON,
-                "-m",
-                "bdpl.cli",
-                "remux",
-                _bdmv(),
-                "--specials",
-                "--visible-only",
-                "--dry-run",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
+        result = cli_runner(
+            "remux",
+            str(bdmv_path),
+            "--specials",
+            "--visible-only",
+            "--dry-run",
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"

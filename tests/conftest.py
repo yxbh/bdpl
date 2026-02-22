@@ -1,4 +1,7 @@
 import os
+import subprocess
+import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -108,3 +111,18 @@ def disc4_analysis(disc4_path):
 def disc5_analysis(disc5_path):
     """Run and cache full analysis for the bundled disc5 fixture."""
     return _analyze_fixture(disc5_path)
+
+
+@pytest.fixture
+def cli_runner() -> Callable[..., subprocess.CompletedProcess[str]]:
+    """Return helper to invoke `python -m bdpl.cli` consistently in tests."""
+
+    def _run(*args: str, timeout: int = 60) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "-m", "bdpl.cli", *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+    return _run
