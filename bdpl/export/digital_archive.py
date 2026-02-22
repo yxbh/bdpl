@@ -220,8 +220,6 @@ def export_digital_archive_images(
         created.append(output)
 
     if errors:
-        raise RuntimeError(
-            f"ffmpeg failed for {len(errors)} items:\n" + "\n".join(errors)
-        )
+        raise RuntimeError(f"ffmpeg failed for {len(errors)} items:\n" + "\n".join(errors))
 
     return created

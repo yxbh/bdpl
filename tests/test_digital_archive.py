@@ -28,20 +28,14 @@ def _mk_item(clip_id: str, in_ms: float, out_ms: float) -> PlayItem:
 
 def test_digital_archive_playlist_detected_from_structure() -> None:
     """Many ultra-short unique items should be classified as digital archive shape."""
-    items = [
-        _mk_item(f"{i:05d}", 0.0, 40.0)
-        for i in range(30)
-    ]
+    items = [_mk_item(f"{i:05d}", 0.0, 40.0) for i in range(30)]
     pl = Playlist(mpls="00003.mpls", play_items=items)
     assert is_digital_archive_playlist(pl)
 
 
 def test_digital_archive_playlist_rejects_low_item_count() -> None:
     """Few short items should not trigger digital archive classification."""
-    items = [
-        _mk_item(f"{i:05d}", 0.0, 40.0)
-        for i in range(10)
-    ]
+    items = [_mk_item(f"{i:05d}", 0.0, 40.0) for i in range(10)]
     pl = Playlist(mpls="00003.mpls", play_items=items)
     assert not is_digital_archive_playlist(pl)
 

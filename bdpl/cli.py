@@ -279,8 +279,7 @@ def archive_cmd(
 
         for plan in plans:
             console.print(
-                f"[bold]{plan['playlist']}[/bold] item {plan['index']:03d}"
-                f" ({plan['clip_id']})"
+                f"[bold]{plan['playlist']}[/bold] item {plan['index']:03d} ({plan['clip_id']})"
             )
             console.print(f"  [dim]{' '.join(plan['command'])}[/dim]")
         return
