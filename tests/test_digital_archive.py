@@ -11,7 +11,7 @@ from bdpl.export.digital_archive import (
     export_digital_archive_images,
     get_digital_archive_dry_run,
 )
-from bdpl.model import DiscAnalysis, PlayItem, Playlist
+from bdpl.model import DiscAnalysis, PlayItem, Playlist, SpecialFeature
 
 
 def _mk_item(clip_id: str, in_ms: float, out_ms: float) -> PlayItem:
@@ -143,3 +143,45 @@ def test_digital_archive_export_collects_partial_failures(tmp_path: Path, monkey
             stream_dir=stream,
             ffmpeg_path="ffmpeg",
         )
+
+
+def test_collect_archive_items_visible_only_filters_hidden() -> None:
+    """Visible-only mode should keep only archive playlists marked menu-visible."""
+    visible_pl = Playlist(mpls="00003.mpls", play_items=[_mk_item("00001", 0.0, 42.0)])
+    hidden_pl = Playlist(mpls="00004.mpls", play_items=[_mk_item("00002", 0.0, 42.0)])
+    analysis = DiscAnalysis(
+        path=str(Path("C:/disc/BDMV")),
+        playlists=[visible_pl, hidden_pl],
+        clips={},
+        episodes=[],
+        warnings=[],
+        special_features=[
+            SpecialFeature(
+                index=1,
+                playlist="00003.mpls",
+                duration_ms=42.0,
+                category="digital_archive",
+                menu_visible=True,
+            ),
+            SpecialFeature(
+                index=2,
+                playlist="00004.mpls",
+                duration_ms=42.0,
+                category="digital_archive",
+                menu_visible=False,
+            ),
+        ],
+        analysis={
+            "classifications": {
+                "00003.mpls": "digital_archive",
+                "00004.mpls": "digital_archive",
+            }
+        },
+    )
+
+    all_items = collect_archive_items(analysis)
+    visible_items = collect_archive_items(analysis, visible_only=True)
+
+    assert len(all_items) == 2
+    assert len(visible_items) == 1
+    assert visible_items[0].playlist == "00003.mpls"

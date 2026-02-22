@@ -95,6 +95,7 @@ def analysis_to_dict(analysis: DiscAnalysis) -> dict:
             "playlist": sf.playlist,
             "duration_ms": sf.duration_ms,
             "category": sf.category,
+            "menu_visible": sf.menu_visible,
         }
         if sf.chapter_start is not None:
             entry["chapter_start"] = sf.chapter_start

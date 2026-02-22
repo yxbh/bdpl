@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from bdpl.model import Episode, Playlist, SegmentRef, ticks_to_ms
 
 # Minimum duration (seconds) for an item to be considered an episode
@@ -27,6 +29,8 @@ def _episodes_from_individual(
     Sort by the body segment's clip_id (clip IDs increase with episode order).
     """
 
+    episode_playlists = _collapse_body_equivalent_variants(episode_playlists)
+
     # Sort by first BODY clip_id, falling back to first clip_id
     def _sort_key(pl: Playlist) -> str:
         for pi in pl.play_items:
@@ -49,6 +53,27 @@ def _episodes_from_individual(
             )
         )
     return episodes
+
+
+def _body_signature(playlist: Playlist) -> tuple:
+    """Return a normalized signature of BODY segments for one playlist."""
+    body_segments = [
+        pi.segment_key(quant_ms=5000) for pi in playlist.play_items if pi.label == "BODY"
+    ]
+    if body_segments:
+        return tuple(body_segments)
+    return playlist.signature_loose()
+
+
+def _collapse_body_equivalent_variants(playlists: Iterable[Playlist]) -> list[Playlist]:
+    """Collapse episode variants that share the same BODY segment signature."""
+    by_sig: dict[tuple, Playlist] = {}
+    for playlist in playlists:
+        sig = _body_signature(playlist)
+        current = by_sig.get(sig)
+        if current is None or playlist.duration_ms > current.duration_ms:
+            by_sig[sig] = playlist
+    return list(by_sig.values())
 
 
 def _episodes_from_play_all(
@@ -196,6 +221,7 @@ def _episodes_from_chapters(
 def order_episodes(
     playlists: list[Playlist],
     play_all_playlists: list[Playlist],
+    classifications: dict[str, str] | None = None,
 ) -> list[Episode]:
     """Infer ordered episode list.
 
@@ -209,11 +235,18 @@ def order_episodes(
     play_all_names = {pl.mpls for pl in play_all_playlists}
 
     # Find individual episode playlists (not play-all, >10 min)
-    individual_eps = [
-        pl
-        for pl in playlists
-        if pl.mpls not in play_all_names and pl.duration_seconds >= _EPISODE_MIN_S
-    ]
+    if classifications and any(cat == "episode" for cat in classifications.values()):
+        individual_eps = [
+            pl
+            for pl in playlists
+            if pl.mpls not in play_all_names and classifications.get(pl.mpls) == "episode"
+        ]
+    else:
+        individual_eps = [
+            pl
+            for pl in playlists
+            if pl.mpls not in play_all_names and pl.duration_seconds >= _EPISODE_MIN_S
+        ]
 
     # Strategy 2: decompose the longest Play All
     pa_episodes: list[Episode] = []

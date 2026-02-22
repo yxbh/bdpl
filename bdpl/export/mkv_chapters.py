@@ -439,12 +439,19 @@ def export_specials_mkv(
     mkvmerge_path: str | None = None,
     on_progress: Callable[[int, int, str], None] | None = None,
     pattern: str = "{name} - S00E{idx:02d} - {category}.mkv",
+    visible_only: bool = False,
 ) -> list[Path]:
     """Generate one MKV per special feature.
 
     Returns list of created MKV paths.
     """
     if not analysis.special_features:
+        return []
+
+    specials = [
+        sf for sf in analysis.special_features if (sf.menu_visible or not visible_only)
+    ]
+    if not specials:
         return []
 
     out = Path(out_dir).resolve()
@@ -470,9 +477,9 @@ def export_specials_mkv(
     name = _disc_name(analysis)
     pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
     created: list[Path] = []
-    total = len(analysis.special_features)
+    total = len(specials)
 
-    for sf in analysis.special_features:
+    for sf in specials:
         pl = pl_by_name.get(sf.playlist)
         if pl is None:
             continue
@@ -498,9 +505,16 @@ def get_specials_dry_run(
     out_dir: str | Path,
     stream_dir: str | Path | None = None,
     pattern: str = "{name} - S00E{idx:02d} - {category}.mkv",
+    visible_only: bool = False,
 ) -> list[dict]:
     """Return the mkvmerge commands for special features without executing."""
     if not analysis.special_features:
+        return []
+
+    specials = [
+        sf for sf in analysis.special_features if (sf.menu_visible or not visible_only)
+    ]
+    if not specials:
         return []
 
     out = Path(out_dir).resolve()
@@ -520,7 +534,7 @@ def get_specials_dry_run(
     pl_by_name = {pl.mpls: pl for pl in analysis.playlists}
     result = []
 
-    for sf in analysis.special_features:
+    for sf in specials:
         pl = pl_by_name.get(sf.playlist)
         if pl is None:
             continue

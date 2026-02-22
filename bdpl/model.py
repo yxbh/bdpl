@@ -119,6 +119,7 @@ class SpecialFeature:
     duration_ms: float
     category: str  # creditless_op, creditless_ed, extra, preview, etc.
     chapter_start: int | None = None  # chapter index if feature is part of a multi-feature playlist
+    menu_visible: bool = True
 
 
 @dataclass(slots=True)
