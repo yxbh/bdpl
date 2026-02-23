@@ -68,6 +68,30 @@ class TestSpecialFeatures:
         )
         assert chapter_starts == [0, 3]
 
+    def test_playlist_00008_split_duration_boundary_fallback(
+        self, disc1_analysis: DiscAnalysis
+    ) -> None:
+        """Verify out-of-range chapter marks fall back to full playlist duration."""
+        specials = sorted(
+            (
+                sf
+                for sf in disc1_analysis.special_features
+                if sf.playlist == "00008.mpls" and sf.chapter_start is not None
+            ),
+            key=lambda sf: sf.chapter_start,
+        )
+        assert [sf.chapter_start for sf in specials] == [0, 3]
+        assert all(sf.duration_ms > 0 for sf in specials)
+
+        source = next(pl for pl in disc1_analysis.playlists if pl.mpls == "00008.mpls")
+        assert source.chapters
+        max_valid_chapter = len(source.chapters) - 1
+        assert specials[-1].chapter_start is not None
+        assert specials[-1].chapter_start > max_valid_chapter
+
+        assert abs(specials[0].duration_ms - source.duration_ms) < 1.0
+        assert abs(specials[1].duration_ms - source.duration_ms) < 1.0
+
 
 class TestJsonExport:
     def test_json_export_valid(self, disc1_analysis: DiscAnalysis) -> None:
