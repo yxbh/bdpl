@@ -36,6 +36,7 @@ def test_disc_episode_expectation_matrix(
 @pytest.mark.parametrize(
     ("analysis_fixture", "expected_total", "expected_visible"),
     [
+        ("disc1_analysis", 9, 9),
         ("disc5_analysis", 14, 11),
         ("disc6_analysis", 3, 3),
     ],
