@@ -35,10 +35,10 @@ def test_disc_episode_expectation_matrix(
 
 @pytest.mark.parametrize(
     ("analysis_fixture", "expected_total", "expected_visible"),
-    [
-        ("disc1_analysis", 9, 9),
-        ("disc5_analysis", 14, 11),
-        ("disc6_analysis", 3, 3),
+    [  # (analysis_fixture, expected_total, expected_visible)
+        ("disc1_analysis", 9, 9),  # 7 title-hint + 2 chapter-split
+        ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
+        ("disc6_analysis", 3, 3),  # 3 title-hint specials
     ],
 )
 def test_disc_special_visibility_expectation_matrix(
@@ -90,7 +90,14 @@ def test_disc_episode_segment_boundaries_matrix(
 
 @pytest.mark.parametrize(
     "analysis_fixture",
-    ["disc1_analysis", "disc5_analysis", "disc6_analysis"],
+    [
+        "disc1_analysis",
+        "disc2_analysis",
+        "disc3_analysis",
+        "disc4_analysis",
+        "disc5_analysis",
+        "disc6_analysis",
+    ],
 )
 def test_disc_special_boundary_semantics_matrix(
     request: pytest.FixtureRequest,
@@ -121,8 +128,11 @@ def test_disc_special_boundary_semantics_matrix(
 
 @pytest.mark.parametrize(
     ("analysis_fixture", "expected_chapter_split_specials"),
-    [
-        ("disc1_analysis", 2),
+    [  # (analysis_fixture, expected_chapter_split_specials)
+        ("disc1_analysis", 2),  # PlayPL_PM marks → 2 chapter-split entries
+        ("disc2_analysis", 0),
+        ("disc3_analysis", 0),
+        ("disc4_analysis", 0),
         ("disc5_analysis", 0),
         ("disc6_analysis", 0),
     ],

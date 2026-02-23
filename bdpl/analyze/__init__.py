@@ -83,10 +83,11 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
             for obj in mo.objects:
                 if obj.referenced_playlists:
                     obj_playlists[obj.object_id] = obj.referenced_playlists
+                # PlayPL_PM commands (op_code 2): play playlist at mark
                 marks = [
                     (cmd.operand1, cmd.operand2)
                     for cmd in obj.commands
-                    if cmd.group == 0 and cmd.sub_group == 2 and cmd.op_code == 2
+                    if cmd.is_play_playlist and cmd.op_code == 2
                 ]
                 if marks:
                     obj_play_marks[obj.object_id] = marks
@@ -283,45 +284,73 @@ def _detect_special_features(
         if category in {"episode", "play_all"}:
             continue
 
-        if chapter_starts and pl.chapters:
-            for chapter_idx, chapter_start in enumerate(chapter_starts):
-                key = (mpls, chapter_start)
-                if key in existing_keys:
-                    continue
-                chapter_end = (
-                    chapter_starts[chapter_idx + 1]
-                    if chapter_idx + 1 < len(chapter_starts)
-                    else None
-                )
-                features.append(
-                    SpecialFeature(
-                        index=idx,
-                        playlist=mpls,
-                        duration_ms=_duration_from_chapter_window(pl, chapter_start, chapter_end),
-                        category=category,
-                        chapter_start=chapter_start,
-                        menu_visible=True,
-                    )
-                )
-                existing_keys.add(key)
-                idx += 1
-            continue
-
-        key = (mpls, None)
-        if key in existing_keys:
-            continue
-        features.append(
-            SpecialFeature(
-                index=idx,
-                playlist=mpls,
-                duration_ms=pl.duration_ms,
-                category=category,
-                menu_visible=True,
-            )
+        new_features = _build_chapter_split_features(
+            pl, mpls, category, chapter_starts, idx, existing_keys,
         )
-        existing_keys.add(key)
-        idx += 1
+        features.extend(new_features)
+        idx += len(new_features)
 
+    return features
+
+
+def _build_chapter_split_features(
+    playlist: Playlist,
+    mpls: str,
+    category: str,
+    chapter_starts: list[int],
+    start_idx: int,
+    existing_keys: set[tuple[str, int | None]] | None = None,
+) -> list[SpecialFeature]:
+    """Build SpecialFeature entries for a playlist, optionally split by chapter marks.
+
+    When *chapter_starts* is non-empty and the playlist has chapters, one feature
+    is emitted per chapter window.  Otherwise a single whole-playlist feature is
+    emitted.  *existing_keys* is checked for dedup and updated in-place when
+    provided.
+    """
+    if existing_keys is None:
+        existing_keys = set()
+
+    features: list[SpecialFeature] = []
+    idx = start_idx
+
+    if chapter_starts and playlist.chapters:
+        for ci, chapter_start in enumerate(chapter_starts):
+            key = (mpls, chapter_start)
+            if key in existing_keys:
+                continue
+            chapter_end = (
+                chapter_starts[ci + 1] if ci + 1 < len(chapter_starts) else None
+            )
+            features.append(
+                SpecialFeature(
+                    index=idx,
+                    playlist=mpls,
+                    duration_ms=_duration_from_chapter_window(
+                        playlist, chapter_start, chapter_end,
+                    ),
+                    category=category,
+                    chapter_start=chapter_start,
+                    menu_visible=True,
+                )
+            )
+            existing_keys.add(key)
+            idx += 1
+        return features
+
+    key = (mpls, None)
+    if key in existing_keys:
+        return features
+    features.append(
+        SpecialFeature(
+            index=idx,
+            playlist=mpls,
+            duration_ms=playlist.duration_ms,
+            category=category,
+            menu_visible=True,
+        )
+    )
+    existing_keys.add(key)
     return features
 
 
@@ -362,6 +391,10 @@ def _title_hint_non_episode_entries(
                 if pl_num == playlist_num and mark >= 0
             }
             if starts:
+                # Always include chapter 0 so the segment before the first
+                # explicit mark is also emitted as a feature.  This covers
+                # the common case where a single playlist bundles multiple
+                # specials and the first one starts at the beginning.
                 starts = starts | {0}
                 chapter_starts = sorted(starts)
 
@@ -385,13 +418,21 @@ def _duration_from_chapter_window(
 
     chapter_times = [ticks_to_ms(chapter.timestamp) for chapter in playlist.chapters]
     if chapter_start < 0 or chapter_start >= len(chapter_times):
+        log.debug(
+            "Out-of-range chapter_start %d (max %d) for %s — using full playlist duration",
+            chapter_start,
+            len(chapter_times) - 1,
+            playlist.mpls,
+        )
         return playlist.duration_ms
 
     start_ms = chapter_times[chapter_start]
     if chapter_end is not None and 0 <= chapter_end < len(chapter_times):
         end_ms = chapter_times[chapter_end]
-    else:
+    elif playlist.play_items:
         end_ms = ticks_to_ms(playlist.play_items[-1].out_time)
+    else:
+        return playlist.duration_ms
 
     duration_ms = end_ms - start_ms
     return duration_ms if duration_ms > 0 else playlist.duration_ms
@@ -493,40 +534,11 @@ def _special_features_from_classifications(
             if category in {"episode", "play_all"}:
                 category = "extra"
 
-            if chapter_starts and pl.chapters:
-                for chapter_idx, chapter_start in enumerate(chapter_starts):
-                    chapter_end = (
-                        chapter_starts[chapter_idx + 1]
-                        if chapter_idx + 1 < len(chapter_starts)
-                        else None
-                    )
-                    features.append(
-                        SpecialFeature(
-                            index=idx,
-                            playlist=mpls,
-                            duration_ms=_duration_from_chapter_window(
-                                pl,
-                                chapter_start,
-                                chapter_end,
-                            ),
-                            category=category,
-                            chapter_start=chapter_start,
-                            menu_visible=True,
-                        )
-                    )
-                    idx += 1
-                continue
-
-            features.append(
-                SpecialFeature(
-                    index=idx,
-                    playlist=mpls,
-                    duration_ms=pl.duration_ms,
-                    category=category,
-                    menu_visible=True,
-                )
+            new_features = _build_chapter_split_features(
+                pl, mpls, category, chapter_starts, idx,
             )
-            idx += 1
+            features.extend(new_features)
+            idx += len(new_features)
 
         _apply_menu_visibility_from_hints(features, hints or {})
         return features

@@ -68,10 +68,15 @@ class TestSpecialFeatures:
         )
         assert chapter_starts == [0, 3]
 
-    def test_playlist_00008_split_duration_boundary_fallback(
+    def test_playlist_00008_split_duration_end_boundary_fallback(
         self, disc1_analysis: DiscAnalysis
     ) -> None:
-        """Verify out-of-range chapter marks fall back to full playlist duration."""
+        """Both chapter-split specials resolve to full playlist duration.
+
+        chapter_start=0 is valid but chapter_end=3 exceeds the chapter count,
+        so the end time falls back to the playlist out_time.  chapter_start=3
+        is itself out-of-range and falls back directly.
+        """
         specials = sorted(
             (
                 sf
