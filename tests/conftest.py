@@ -12,7 +12,6 @@ from bdpl.bdmv.mpls import parse_mpls_dir
 
 _FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc1"
 _FIXTURES_ROOT: Path = Path(__file__).parent / "fixtures"
-_DISC5_FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc5"
 
 
 def _fixture_path(name: str) -> Path:

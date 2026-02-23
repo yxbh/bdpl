@@ -139,3 +139,4 @@ class DiscAnalysis:
     warnings: list[Warning]
     special_features: list[SpecialFeature] = field(default_factory=list)
     analysis: dict = field(default_factory=dict)
+    disc_title: str = ""

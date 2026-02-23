@@ -35,9 +35,10 @@ def test_disc_episode_expectation_matrix(
 
 @pytest.mark.parametrize(
     ("analysis_fixture", "expected_total", "expected_visible"),
-    [
-        ("disc5_analysis", 14, 11),
-        ("disc6_analysis", 3, 3),
+    [  # (analysis_fixture, expected_total, expected_visible)
+        ("disc1_analysis", 9, 9),  # 7 title-hint + 2 chapter-split
+        ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
+        ("disc6_analysis", 3, 3),  # 3 title-hint specials
     ],
 )
 def test_disc_special_visibility_expectation_matrix(
@@ -54,3 +55,97 @@ def test_disc_special_visibility_expectation_matrix(
 
     assert total == expected_total
     assert visible == expected_visible
+
+
+@pytest.mark.parametrize(
+    "analysis_fixture",
+    [
+        "disc1_analysis",
+        "disc2_analysis",
+        "disc3_analysis",
+        "disc4_analysis",
+        "disc5_analysis",
+        "disc6_analysis",
+    ],
+)
+def test_disc_episode_segment_boundaries_matrix(
+    request: pytest.FixtureRequest,
+    analysis_fixture: str,
+) -> None:
+    """Validate episode segment start/end boundaries and duration consistency."""
+    analysis: DiscAnalysis = request.getfixturevalue(analysis_fixture)
+
+    for episode in analysis.episodes:
+        assert episode.segments
+
+        total_segment_duration = 0.0
+        for segment in episode.segments:
+            assert segment.in_ms >= 0
+            assert segment.out_ms > segment.in_ms
+            assert segment.duration_ms > 0
+            total_segment_duration += segment.duration_ms
+
+        assert abs(total_segment_duration - episode.duration_ms) < 1.0
+
+
+@pytest.mark.parametrize(
+    "analysis_fixture",
+    [
+        "disc1_analysis",
+        "disc2_analysis",
+        "disc3_analysis",
+        "disc4_analysis",
+        "disc5_analysis",
+        "disc6_analysis",
+    ],
+)
+def test_disc_special_boundary_semantics_matrix(
+    request: pytest.FixtureRequest,
+    analysis_fixture: str,
+) -> None:
+    """Validate chapter-targeted special boundaries against source playlist chapters."""
+    analysis: DiscAnalysis = request.getfixturevalue(analysis_fixture)
+    playlists_by_name = {playlist.mpls: playlist for playlist in analysis.playlists}
+
+    for feature in analysis.special_features:
+        assert feature.duration_ms > 0
+        if feature.chapter_start is None:
+            continue
+
+        playlist = playlists_by_name.get(feature.playlist)
+        assert playlist is not None
+
+        # Valid chapter index: feature should be bounded by chapter windows and
+        # never exceed source playlist duration.
+        if 0 <= feature.chapter_start < len(playlist.chapters):
+            assert feature.duration_ms <= playlist.duration_ms
+            continue
+
+        # Out-of-range chapter index: analyzer intentionally falls back to full
+        # playlist duration for robust metadata-only behavior.
+        assert abs(feature.duration_ms - playlist.duration_ms) < 1.0
+
+
+@pytest.mark.parametrize(
+    ("analysis_fixture", "expected_chapter_split_specials"),
+    [  # (analysis_fixture, expected_chapter_split_specials)
+        ("disc1_analysis", 2),  # PlayPL_PM marks → 2 chapter-split entries
+        ("disc2_analysis", 0),
+        ("disc3_analysis", 0),
+        ("disc4_analysis", 0),
+        ("disc5_analysis", 0),
+        ("disc6_analysis", 0),
+    ],
+)
+def test_disc_special_chapter_split_expectation_matrix(
+    request: pytest.FixtureRequest,
+    analysis_fixture: str,
+    expected_chapter_split_specials: int,
+) -> None:
+    """Validate chapter-targeted special feature counts across key fixtures."""
+    analysis: DiscAnalysis = request.getfixturevalue(analysis_fixture)
+
+    chapter_split = sum(
+        1 for feature in analysis.special_features if feature.chapter_start is not None
+    )
+    assert chapter_split == expected_chapter_split_specials

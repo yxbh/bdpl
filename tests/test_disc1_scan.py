@@ -52,6 +52,52 @@ class TestWarningsEmitted:
         assert "PLAY_ALL_ONLY" in codes
 
 
+class TestSpecialFeatures:
+    def test_special_feature_count(self, disc1_analysis: DiscAnalysis) -> None:
+        """Verify disc1 exposes 9 special features."""
+        assert len(disc1_analysis.special_features) == 9
+
+    def test_playlist_00008_has_two_chapter_split_specials(
+        self, disc1_analysis: DiscAnalysis
+    ) -> None:
+        """Verify playlist 00008.mpls is exposed as two chapter-targeted specials."""
+        chapter_starts = sorted(
+            sf.chapter_start
+            for sf in disc1_analysis.special_features
+            if sf.playlist == "00008.mpls" and sf.chapter_start is not None
+        )
+        assert chapter_starts == [0, 3]
+
+    def test_playlist_00008_split_duration_end_boundary_fallback(
+        self, disc1_analysis: DiscAnalysis
+    ) -> None:
+        """Both chapter-split specials resolve to full playlist duration.
+
+        chapter_start=0 is valid but chapter_end=3 exceeds the chapter count,
+        so the end time falls back to the playlist out_time.  chapter_start=3
+        is itself out-of-range and falls back directly.
+        """
+        specials = sorted(
+            (
+                sf
+                for sf in disc1_analysis.special_features
+                if sf.playlist == "00008.mpls" and sf.chapter_start is not None
+            ),
+            key=lambda sf: sf.chapter_start,
+        )
+        assert [sf.chapter_start for sf in specials] == [0, 3]
+        assert all(sf.duration_ms > 0 for sf in specials)
+
+        source = next(pl for pl in disc1_analysis.playlists if pl.mpls == "00008.mpls")
+        assert source.chapters
+        max_valid_chapter = len(source.chapters) - 1
+        assert specials[-1].chapter_start is not None
+        assert specials[-1].chapter_start > max_valid_chapter
+
+        assert abs(specials[0].duration_ms - source.duration_ms) < 1.0
+        assert abs(specials[1].duration_ms - source.duration_ms) < 1.0
+
+
 class TestJsonExport:
     def test_json_export_valid(self, disc1_analysis: DiscAnalysis) -> None:
         """Verify JSON export is valid JSON and has required keys."""

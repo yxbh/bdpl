@@ -118,6 +118,7 @@ def analysis_to_dict(analysis: DiscAnalysis) -> dict:
         "schema_version": "bdpl.disc.v1",
         "disc": {
             "path": analysis.path,
+            "title": analysis.disc_title or None,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         },
         "playlists": playlists,

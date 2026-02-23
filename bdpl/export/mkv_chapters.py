@@ -295,7 +295,9 @@ def export_chapter_mkv(
         )
         # mkvmerge returns 0 (success) or 1 (warnings) or 2 (error)
         if result.returncode > 1:
-            raise RuntimeError(f"mkvmerge failed for episode {ep.episode}:\n{result.stderr}")
+            raise RuntimeError(
+                f"mkvmerge failed for episode {ep.episode}:\n{result.stderr or result.stdout}"
+            )
 
         # Clean up chapter file
         chapter_file.unlink(missing_ok=True)
@@ -379,8 +381,19 @@ def get_dry_run_commands(
 # ── Special features export ──────────────────────────────────────────
 
 
+def _sanitize_filename(name: str) -> str:
+    """Remove or replace characters illegal in Windows/NTFS filenames."""
+    # Characters illegal in NTFS: \ / : * ? " < > |
+    for ch in r'\/:*?"<>|':
+        name = name.replace(ch, " ")
+    # Collapse runs of whitespace
+    return " ".join(name.split())
+
+
 def _disc_name(analysis: DiscAnalysis) -> str:
-    """Derive a disc name from the BDMV parent folder."""
+    """Derive a disc name from metadata or the BDMV parent folder."""
+    if analysis.disc_title:
+        return _sanitize_filename(analysis.disc_title)
     bdmv = Path(analysis.path).resolve()
     # BDMV/ is typically inside a disc folder like UCG_0080_D1/BDMV
     parent = bdmv.parent
