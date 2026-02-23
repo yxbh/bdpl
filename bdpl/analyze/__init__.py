@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
 
@@ -109,6 +110,11 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
                 title_playlists[t["title"]] = obj_pl[obj_id]
         hints["title_playlists"] = title_playlists
 
+    # --- Disc title from META/DL/bdmt_*.xml ---
+    disc_title = _parse_disc_title(bdmv_path)
+    if disc_title:
+        hints["disc_title"] = disc_title
+
     # --- IG stream (experimental) ---
     if clips:
         try:
@@ -117,6 +123,29 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
             log.debug("Failed to parse IG menu hints", exc_info=True)
 
     return hints
+
+
+def _parse_disc_title(bdmv_path: Path) -> str:
+    """Extract disc title from BDMV/META/DL/bdmt_eng.xml (or other languages)."""
+    meta_dir = bdmv_path / "META" / "DL"
+    if not meta_dir.is_dir():
+        return ""
+    # Prefer English, then fall back to any available language
+    candidates = [meta_dir / "bdmt_eng.xml"]
+    candidates.extend(p for p in sorted(meta_dir.glob("bdmt_*.xml")) if p.name != "bdmt_eng.xml")
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            tree = ET.parse(path)  # noqa: S314
+            # Walk all elements looking for <di:name> regardless of namespace
+            for elem in tree.iter():
+                tag = elem.tag.rpartition("}")[2] if "}" in elem.tag else elem.tag
+                if tag == "name" and elem.text and elem.text.strip():
+                    return elem.text.strip()
+        except Exception:
+            log.debug("Failed to parse %s", path, exc_info=True)
+    return ""
 
 
 def _parse_ig_hints(bdmv_path: Path, clips: dict[str, ClipInfo], hints: dict) -> None:
@@ -285,7 +314,12 @@ def _detect_special_features(
             continue
 
         new_features = _build_chapter_split_features(
-            pl, mpls, category, chapter_starts, idx, existing_keys,
+            pl,
+            mpls,
+            category,
+            chapter_starts,
+            idx,
+            existing_keys,
         )
         features.extend(new_features)
         idx += len(new_features)
@@ -319,15 +353,15 @@ def _build_chapter_split_features(
             key = (mpls, chapter_start)
             if key in existing_keys:
                 continue
-            chapter_end = (
-                chapter_starts[ci + 1] if ci + 1 < len(chapter_starts) else None
-            )
+            chapter_end = chapter_starts[ci + 1] if ci + 1 < len(chapter_starts) else None
             features.append(
                 SpecialFeature(
                     index=idx,
                     playlist=mpls,
                     duration_ms=_duration_from_chapter_window(
-                        playlist, chapter_start, chapter_end,
+                        playlist,
+                        chapter_start,
+                        chapter_end,
                     ),
                     category=category,
                     chapter_start=chapter_start,
@@ -535,7 +569,11 @@ def _special_features_from_classifications(
                 category = "extra"
 
             new_features = _build_chapter_split_features(
-                pl, mpls, category, chapter_starts, idx,
+                pl,
+                mpls,
+                category,
+                chapter_starts,
+                idx,
             )
             features.extend(new_features)
             idx += len(new_features)
@@ -973,4 +1011,5 @@ def scan_disc(
         warnings=warnings,
         special_features=special_features,
         analysis=analysis,
+        disc_title=hints.get("disc_title", ""),
     )
