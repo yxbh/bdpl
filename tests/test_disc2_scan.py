@@ -31,3 +31,11 @@ class TestChapterSplitting:
             assert seg_a.out_ms <= seg_b.in_ms, (
                 f"Ep {i + 1} end {seg_a.out_ms} overlaps Ep {i + 2} start {seg_b.in_ms}"
             )
+
+    def test_no_special_features(self, disc2_analysis: DiscAnalysis) -> None:
+        """Disc2 is a chapter-split disc with no extras."""
+        assert len(disc2_analysis.special_features) == 0
+
+    def test_disc_title(self, disc2_analysis: DiscAnalysis) -> None:
+        """Disc title should be extracted from META/DL/bdmt_eng.xml."""
+        assert disc2_analysis.disc_title == "TEST DISC 2"
