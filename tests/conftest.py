@@ -196,6 +196,18 @@ def disc12_analysis(disc12_path):
     return _analyze_fixture(disc12_path)
 
 
+@pytest.fixture(scope="session")
+def disc13_path() -> Path:
+    """Return path to bundled disc13 fixture."""
+    return _fixture_path("disc13")
+
+
+@pytest.fixture(scope="session")
+def disc13_analysis(disc13_path):
+    """Run and cache full analysis for the bundled disc13 fixture."""
+    return _analyze_fixture(disc13_path)
+
+
 @pytest.fixture
 def cli_runner() -> Callable[..., subprocess.CompletedProcess[str]]:
     """Return helper to invoke `python -m bdpl.cli` consistently in tests."""
