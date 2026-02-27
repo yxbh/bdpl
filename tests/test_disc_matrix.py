@@ -20,7 +20,7 @@ pytestmark = pytest.mark.integration
         ("disc6_analysis", 2, ["00003.mpls", "00005.mpls"]),
         ("disc7_analysis", 2, ["00003.mpls", "00004.mpls"]),
         ("disc8_analysis", 2, ["00003.mpls", "00004.mpls"]),
-        ("disc9_analysis", 2, ["00002.mpls", "00003.mpls"]),
+        ("disc9_analysis", 1, ["00002.mpls"]),
     ],
 )
 def test_disc_episode_expectation_matrix(
@@ -46,7 +46,7 @@ def test_disc_episode_expectation_matrix(
         ("disc6_analysis", 3, 3),  # 3 title-hint specials
         ("disc7_analysis", 2, 2),  # 2 title-hint specials (stream variants)
         ("disc8_analysis", 2, 2),  # 2 title-hint specials (stream variants)
-        ("disc9_analysis", 0, 0),  # stream-variant playlists not deduped
+        ("disc9_analysis", 1, 1),  # alt-audio variant detected as special
     ],
 )
 def test_disc_special_visibility_expectation_matrix(

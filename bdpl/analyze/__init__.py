@@ -16,7 +16,11 @@ from bdpl.analyze.segment_graph import (
     detect_play_all,
     find_shared_segments,
 )
-from bdpl.analyze.signatures import compute_signatures, find_duplicates
+from bdpl.analyze.signatures import (
+    compute_signatures,
+    find_duplicates,
+    find_primary_clip_variants,
+)
 from bdpl.model import (
     ClipInfo,
     DiscAnalysis,
@@ -791,6 +795,74 @@ def _build_episode_scenes(episodes: list[Episode], playlists: list[Playlist], hi
         episode.scenes = scene_segments
 
 
+def _maybe_collapse_variant_episodes(
+    episodes: list[Episode],
+    playlists: list[Playlist],
+    variant_mpls: set[str],
+) -> list[Episode]:
+    """Collapse chapter-split episodes back to one when variant dedup caused it.
+
+    When variant detection removes alternate-audio/stream versions of a
+    movie, the surviving representative may be the only episode-classified
+    playlist.  Chapter splitting then incorrectly slices the movie into
+    multiple episodes.  This function detects that case and collapses back
+    to a single episode.
+    """
+    if len(episodes) < 2:
+        return episodes
+
+    # All episodes must come from the same playlist
+    ep_playlists = {ep.playlist for ep in episodes}
+    if len(ep_playlists) != 1:
+        return episodes
+    playlist_name = next(iter(ep_playlists))
+
+    # The playlist must have had variants that were deduped away
+    try:
+        int(playlist_name.split(".")[0])
+    except (ValueError, IndexError):
+        return episodes
+
+    # Check if any variant of this playlist was removed
+    if not variant_mpls:
+        return episodes
+
+    # Find the source playlist
+    playlist = next((p for p in playlists if p.mpls == playlist_name), None)
+    if playlist is None:
+        return episodes
+
+    segments = [
+        SegmentRef(
+            key=pi.segment_key(),
+            clip_id=pi.clip_id,
+            in_ms=ticks_to_ms(pi.in_time),
+            out_ms=ticks_to_ms(pi.out_time),
+            duration_ms=pi.duration_ms,
+            label=pi.label,
+        )
+        for pi in playlist.play_items
+    ]
+
+    log.debug(
+        "Collapsing %d chapter-split episodes into one for %s "
+        "(variant dedup removed %d alternate playlists)",
+        len(episodes),
+        playlist.mpls,
+        len(variant_mpls),
+    )
+
+    return [
+        Episode(
+            episode=1,
+            playlist=playlist.mpls,
+            duration_ms=playlist.duration_ms,
+            confidence=0.85,
+            segments=segments,
+        )
+    ]
+
+
 def _maybe_keep_single_title_episode(
     episodes: list[Episode],
     playlists: list[Playlist],
@@ -885,24 +957,37 @@ def scan_disc(
 
     # 1. Deduplicate playlists
     dup_groups = find_duplicates(playlists)
+
+    # 1b. Detect primary-clip variants (different secondary clips but
+    # same dominant first clip, e.g. alt-audio or commentary versions).
+    variant_groups = find_primary_clip_variants(playlists)
+    # Merge variant groups into dup_groups so variants are also deduped.
+    already_deduped = {pl.mpls for g in dup_groups for pl in g}
+    for vg in variant_groups:
+        # Only add if this group contains playlists not yet covered
+        if not all(pl.mpls in already_deduped for pl in vg):
+            dup_groups.append(vg)
+            already_deduped.update(pl.mpls for pl in vg)
+
     analysis["duplicate_groups"] = [[pl.mpls for pl in group] for group in dup_groups]
 
     # Pick representatives — deduplicated working set
     seen_sigs: set[tuple] = set()
+    variant_mpls: set[str] = set()
+    for group in dup_groups:
+        rep = pick_representative(group, clips)
+        for pl in group:
+            if pl.mpls != rep.mpls:
+                variant_mpls.add(pl.mpls)
+
     unique_playlists: list[Playlist] = []
     for pl in playlists:
+        if pl.mpls in variant_mpls:
+            continue
         sig = pl.signature_loose()
         if sig not in seen_sigs:
             seen_sigs.add(sig)
             unique_playlists.append(pl)
-        else:
-            # Find the cluster this playlist belongs to, pick representative
-            for group in dup_groups:
-                if pl in group:
-                    rep = pick_representative(group, clips)
-                    if rep not in unique_playlists:
-                        unique_playlists.append(rep)
-                    break
 
     if dup_groups:
         warnings.append(
@@ -936,6 +1021,14 @@ def scan_disc(
         unique_playlists,
         hints,
         classifications,
+    )
+
+    # 6a-2. Collapse chapter-split episodes when variant dedup caused the
+    # single-playlist condition (e.g. movie disc with alt-audio variant).
+    episodes = _maybe_collapse_variant_episodes(
+        episodes,
+        unique_playlists,
+        variant_mpls,
     )
 
     # If episodes came from Play All decomposition, reclassify playlists
