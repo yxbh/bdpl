@@ -38,4 +38,4 @@ class TestChapterSplitting:
 
     def test_disc_title(self, disc2_analysis: DiscAnalysis) -> None:
         """Disc title should be extracted from META/DL/bdmt_eng.xml."""
-        assert disc2_analysis.disc_title == "MOBILE SUIT GUNDAM THE 08th MS TEAM DISC1"
+        assert disc2_analysis.disc_title == "TEST DISC 2"

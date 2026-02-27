@@ -46,4 +46,4 @@ def test_disc6_has_three_special_features(disc6_analysis: DiscAnalysis) -> None:
 
 def test_disc6_disc_title(disc6_analysis: DiscAnalysis) -> None:
     """Disc title should be extracted from META/DL/bdmt_eng.xml."""
-    assert disc6_analysis.disc_title == "MOBILE SUIT GUNDAM UC Blu-ray DISC 1"
+    assert disc6_analysis.disc_title == "TEST DISC 6"
