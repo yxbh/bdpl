@@ -12,13 +12,13 @@ from bdpl.bdmv.ig_stream import (
     parse_ics,
 )
 
-_FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc2"
+_FIXTURE_DIR: Path = Path(__file__).parent / "fixtures" / "disc14"
 _ICS_FILE: Path = _FIXTURE_DIR / "ics_menu.bin"
 
 
 @pytest.fixture()
 def ics() -> InteractiveComposition:
-    """Parse the disc2 ICS fixture."""
+    """Parse the disc14 ICS fixture."""
     data: bytes = _ICS_FILE.read_bytes()
     return parse_ics(data)
 
@@ -35,7 +35,7 @@ def test_ics_dimensions(ics: InteractiveComposition) -> None:
 
 
 def test_ics_page_count(ics: InteractiveComposition) -> None:
-    """Disc2 menu has 4 pages."""
+    """Disc14 menu has 4 pages."""
     assert len(ics.pages) == 4
 
 
@@ -64,14 +64,14 @@ def test_extract_hints_returns_actions(ics: InteractiveComposition) -> None:
 
 
 def test_hints_contain_register_sets(ics: InteractiveComposition) -> None:
-    """Disc2 episode buttons should SET GPR registers."""
+    """Disc14 episode buttons should SET GPR registers."""
     hints: list[IGMenuHint] = extract_menu_hints(ics)
     reg_hints: list[IGMenuHint] = [h for h in hints if h.register_sets]
     assert len(reg_hints) > 0, "Expected some register-setting buttons"
 
 
 def test_hints_episode_register_pattern(ics: InteractiveComposition) -> None:
-    """Disc2 episode selection buttons SET reg6 to episode indices 0-5."""
+    """Disc14 episode selection buttons SET reg6 to episode indices 0-5."""
     hints: list[IGMenuHint] = extract_menu_hints(ics)
     reg6_values: list[int] = sorted(set(h.register_sets[6] for h in hints if 6 in h.register_sets))
     # reg6 values 0-5 map to episode/segment selection
@@ -80,7 +80,7 @@ def test_hints_episode_register_pattern(ics: InteractiveComposition) -> None:
 
 
 def test_episode_chapter_pattern(ics: InteractiveComposition) -> None:
-    """Disc2 has buttons that SET reg2 to chapter-mark multiples of 5.
+    """Disc14 has buttons that SET reg2 to chapter-mark multiples of 5.
 
     This confirms the 5-chapters-per-episode pattern (marks 0, 5, 10, 15).
     """

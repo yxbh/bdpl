@@ -48,7 +48,7 @@ bdpl/
 │   ├── test_ig_stream.py    # IG stream parser tests (ICS fixture)
 │   ├── test_ordering.py     # Episode ordering unit tests
 │   ├── test_disc1_scan.py   # disc1 integration tests
-│   ├── test_disc2_scan.py   # disc2 chapter-splitting tests
+│   ├── test_disc14_scan.py  # disc14 chapter-splitting tests
 │   ├── test_disc3_scan.py   # disc3 integration tests
 │   ├── test_disc4_scan.py   # disc4 single-main-title + archive tests
 │   ├── test_disc5_scan.py   # disc5 visible/hidden specials tests
@@ -122,7 +122,7 @@ bdpl archive /path/to/BDMV --out ./DigitalArchive
 pytest tests/ -v
 ```
 
-Tests use bundled fixture data from `tests/fixtures/disc1/` and `tests/fixtures/disc2/` by default. Set `BDPL_TEST_BDMV` to override with a real BDMV directory.
+Tests use bundled fixture data from `tests/fixtures/disc1/` and `tests/fixtures/disc14/` by default. Set `BDPL_TEST_BDMV` to override with a real BDMV directory.
 
 ```bash
 # Run all tests (unit tests always run; integration tests need a BDMV)
