@@ -2,29 +2,58 @@
 
 Provenance tracking for all Copilot instruction files and agent skills.
 
+Legend: **upstream** = copied from awesome-copilot as-is · **customized** = forked
+from awesome-copilot with local changes · **project-specific** = written for bdpl,
+no upstream equivalent.
+
 ## Instructions
 
-| File | Source | Notes |
-|------|--------|-------|
-| `python.instructions.md` | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/python.instructions.md) → **customized** | Originally copied from awesome-copilot; updated to match bdpl conventions (100-char lines, modern type syntax, ruff, dataclasses, struct parsing) |
-| `pytest.instructions.md` | **Project-specific** | Written for bdpl's fixture patterns, matrix tests, and disc analysis conventions. Nothing equivalent in awesome-copilot. |
-| `code-review-generic.instructions.md` | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/code-review-generic.instructions.md) | Identical to upstream |
-| `security-and-owasp.instructions.md` | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/security-and-owasp.instructions.md) | Identical to upstream |
-| `agent-skills.instructions.md` | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/agent-skills.instructions.md) | Identical to upstream |
-| `instructions.instructions.md` | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/instructions.instructions.md) | Identical to upstream |
+| File | Status | Source |
+|------|--------|--------|
+| `python.instructions.md` | **customized** | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/python.instructions.md) |
+| `pytest.instructions.md` | **project-specific** | — |
+| `code-review-generic.instructions.md` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/code-review-generic.instructions.md) |
+| `security-and-owasp.instructions.md` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/security-and-owasp.instructions.md) |
+| `agent-skills.instructions.md` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/agent-skills.instructions.md) |
+| `instructions.instructions.md` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/blob/main/instructions/instructions.instructions.md) |
 
 ## Skills
 
-| Skill | Source | Notes |
-|-------|--------|-------|
-| `add-disc-fixture` | **Project-specific** | 10-step disc fixture workflow + analysis debugging guide |
-| `gh-cli` | [awesome-copilot](https://github.com/github/awesome-copilot/tree/main/skills/gh-cli) | GitHub CLI reference |
-| `gh-commit` | [awesome-copilot](https://github.com/github/awesome-copilot/tree/main/skills/gh-commit) | Conventional commit generation |
-| `make-repo-contribution` | [awesome-copilot](https://github.com/github/awesome-copilot/tree/main/skills/make-repo-contribution) | Contribution workflow |
+| Skill | Status | Source |
+|-------|--------|--------|
+| `add-disc-fixture` | **project-specific** | — |
+| `gh-cli` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/tree/main/skills/gh-cli) |
+| `gh-commit` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/tree/main/skills/gh-commit) |
+| `make-repo-contribution` | **upstream** | [awesome-copilot](https://github.com/github/awesome-copilot/tree/main/skills/make-repo-contribution) |
 
-## Upstream Sync
+## Local Modifications
 
-When updating from awesome-copilot, check the "Notes" column:
-- **Identical to upstream** — safe to overwrite with newer version
-- **Customized** — merge manually; review diffs to preserve project-specific changes
-- **Project-specific** — no upstream equivalent; maintained independently
+Changes made to files forked from awesome-copilot. Keep this up to date when
+making further edits so upstream syncs can be done safely.
+
+### `python.instructions.md`
+
+Upstream version is a generic PEP 8 guide. Customized to match bdpl's actual
+tooling and conventions:
+
+- **Line length**: 79 → 100 (matches `line-length = 100` in `pyproject.toml`)
+- **Type hints**: Replaced `typing.List[str]` / `typing.Dict` / `typing.Optional`
+  guidance with modern syntax (`list[str]`, `dict[str, int]`, `X | None`)
+- **Added project conventions section**: `from __future__ import annotations`,
+  `dataclasses` with `slots=True`, `struct` for binary parsing, `typer`/`rich`
+- **String style**: Added double-quote preference (ruff format default)
+- **Import sorting**: Added isort-style via ruff `I` rule
+- **Tooling**: Added `ruff check .` and `ruff format .` as pre-commit steps
+- **Comments**: Changed "write clear and concise comments for each function" to
+  "only comment code that needs clarification" (matches AGENTS.md style guide)
+- **Docstring example**: Modernized to single-line summary style per PEP 257
+- **Removed**: Over-commenting guidance, `typing` module recommendation,
+  mention of external dependency comments
+
+## Upstream Sync Guide
+
+When pulling updates from awesome-copilot:
+
+- **upstream** — safe to overwrite with newer version
+- **customized** — merge manually; check "Local Modifications" above for what to preserve
+- **project-specific** — no upstream equivalent; maintained independently
