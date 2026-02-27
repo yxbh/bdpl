@@ -35,18 +35,28 @@ bdpl/
 │   │   └── digital_archive.py # Digital archive image extraction (needs ffmpeg)
 │   └── remux/               # (v0.3) mkvmerge/ffmpeg integration
 │       └── __init__.py
+│   └── util/
+│       └── __init__.py      # (placeholder) hashing/log helpers planned
 ├── tests/
-│   ├── conftest.py          # Shared fixtures (bdmv_path)
+│   ├── conftest.py          # Shared fixtures (bdmv_path, disc analysis helpers)
+│   ├── builders.py          # Shared test-data builders for model objects
 │   ├── test_reader.py       # BinaryReader unit tests
 │   ├── test_mpls_parse.py   # MPLS parser tests (real BDMV data)
 │   ├── test_clpi_parse.py   # CLPI parser tests (real BDMV data)
 │   ├── test_index_bdmv.py   # index.bdmv parser tests
 │   ├── test_movieobject_bdmv.py # MovieObject.bdmv parser tests
 │   ├── test_ig_stream.py    # IG stream parser tests (ICS fixture)
+│   ├── test_ordering.py     # Episode ordering unit tests
 │   ├── test_disc1_scan.py   # disc1 integration tests
 │   ├── test_disc2_scan.py   # disc2 chapter-splitting tests
 │   ├── test_disc3_scan.py   # disc3 integration tests
 │   ├── test_disc4_scan.py   # disc4 single-main-title + archive tests
+│   ├── test_disc5_scan.py   # disc5 visible/hidden specials tests
+│   ├── test_disc6_scan.py   # disc6 title-hint specials tests
+│   ├── test_disc_matrix.py  # Cross-disc compatibility matrix tests
+│   ├── test_fixture_integrity.py # Fixture validation tests
+│   ├── test_special_visibility_heuristics.py # Visibility heuristic tests
+│   ├── test_specials_visible_only.py # --visible-only export tests
 │   ├── test_digital_archive.py # digital archive detection/extraction tests
 │   └── test_cli.py          # CLI subprocess tests
 ├── pyproject.toml           # Build config, deps (typer, rich, pytest)
@@ -152,9 +162,12 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `special_fea
 - ✅ `archive` extraction command for digital archive still images (via ffmpeg)
 - ✅ `--specials` remux flag for creditless OP/ED, extras, previews
 - ✅ Chapter-based episode splitting with mkvmerge `--split parts:`
-- ✅ Bundled test fixtures (72 tests, no env var needed)
+- ✅ Bundled test fixtures (131 tests, no env var needed)
 - ✅ CLI commands: `scan`, `explain`, `playlist`, `remux`, `archive`
 - ✅ Plex/Jellyfin-compatible default naming (`{name} - S01Exx.mkv`, `{name} - S00Exx - {category}.mkv`)
+- ✅ Special feature visibility detection (`menu_visible` labeling)
+- ✅ `--visible-only` flag for remux/archive workflows
+- ✅ Disc title extraction from BDMV metadata for remux naming
 
 ## Agent Tips
 - When modifying parsers, test against real BDMV data (set `BDPL_TEST_BDMV` env var)

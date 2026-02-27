@@ -444,10 +444,10 @@ Use `rich` tables optionally for readability.
 
 ## 13. Implementation Status
 
-Updated 2026-02-22. v0.1 + v0.2 complete. v0.3 mostly complete. v0.4 mostly complete. 72 tests passing.
+Updated 2026-02-27. v0.1 + v0.2 complete. v0.3 mostly complete. v0.4 mostly complete. 131 tests passing.
 
 Files implemented:
-- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` with `--specials`, `archive`)
+- `bdpl/cli.py` — Typer CLI (`scan`, `explain`, `playlist`, `remux` with `--specials` + `--visible-only`, `archive`)
 - `bdpl/model.py` — Dataclasses (Playlist, PlayItem, Episode, SpecialFeature, DiscAnalysis, etc.)
 - `bdpl/bdmv/reader.py` — Big-endian BinaryReader with zero-copy slicing
 - `bdpl/bdmv/mpls.py` — MPLS parser (play items, chapters, STN streams)
@@ -455,7 +455,7 @@ Files implemented:
 - `bdpl/bdmv/index_bdmv.py` — index.bdmv parser (title→movie object mapping)
 - `bdpl/bdmv/movieobject_bdmv.py` — MovieObject.bdmv parser (navigation commands, playlist refs)
 - `bdpl/bdmv/ig_stream.py` — [Experimental] IG menu stream parser (ICS demux, button nav commands)
-- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator + disc hints + IG hints + special feature detection
+- `bdpl/analyze/__init__.py` — `scan_disc()` orchestrator + disc hints + IG hints + special feature detection + visibility labeling
 - `bdpl/analyze/signatures.py` — Signature computation + duplicate finding
 - `bdpl/analyze/clustering.py` — Duration-based clustering + representative picking
 - `bdpl/analyze/segment_graph.py` — Segment frequency + Play All detection
@@ -467,11 +467,14 @@ Files implemented:
 - `bdpl/export/m3u.py` — M3U debug playlist generation
 - `bdpl/export/digital_archive.py` — digital archive extraction planning + ffmpeg image export
 - `bdpl/export/mkv_chapters.py` — MKV remux with chapters + track names + `--split parts:` for chapter splits + `--specials` for special features
-- `tests/` — 72 tests (reader, mpls, clpi, index, movieobject, ig_stream, chapter_split, scan, disc-specific integration, CLI, digital archive)
+- `tests/` — 131 tests (reader, mpls, clpi, index, movieobject, ig_stream, ordering, scan, disc-specific integration, matrix, fixture integrity, visibility heuristics, visible-only export, CLI, digital archive)
+- `tests/builders.py` — Shared test-data builders for model objects
 - `tests/fixtures/disc1/` — Bundled MPLS/CLPI/index/MovieObject from multi-episode disc
 - `tests/fixtures/disc2/` — Bundled metadata + ICS fixture from single-m2ts chapter-split disc
 - `tests/fixtures/disc3/` — Bundled metadata fixture with 4 inferred episodes
 - `tests/fixtures/disc4/` — Bundled metadata fixture for single 44:03 main title + digital archive menu gallery
+- `tests/fixtures/disc5/` — Bundled metadata fixture for visible/hidden specials behavior
+- `tests/fixtures/disc6/` — Bundled metadata fixture for title-hint-based specials inference
 
 Remaining work:
 - v0.3: `--prefer-audio`/`--prefer-subs`, `remux_plan.json`, `remux/ffmpeg.py`

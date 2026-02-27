@@ -1,3 +1,6 @@
+# Local output directories
+/Episodes/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
