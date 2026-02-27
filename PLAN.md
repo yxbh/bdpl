@@ -470,7 +470,7 @@ Files implemented:
 - `tests/` — 131 tests (reader, mpls, clpi, index, movieobject, ig_stream, ordering, scan, disc-specific integration, matrix, fixture integrity, visibility heuristics, visible-only export, CLI, digital archive)
 - `tests/builders.py` — Shared test-data builders for model objects
 - `tests/fixtures/disc1/` — Bundled MPLS/CLPI/index/MovieObject from multi-episode disc
-- `tests/fixtures/disc2/` — Bundled metadata + ICS fixture from single-m2ts chapter-split disc
+- `tests/fixtures/disc14/` — Bundled metadata + ICS fixture from single-m2ts chapter-split disc
 - `tests/fixtures/disc3/` — Bundled metadata fixture with 4 inferred episodes
 - `tests/fixtures/disc4/` — Bundled metadata fixture for single 44:03 main title + digital archive menu gallery
 - `tests/fixtures/disc5/` — Bundled metadata fixture for visible/hidden specials behavior

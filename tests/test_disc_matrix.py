@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
     ("analysis_fixture", "expected_episode_count", "expected_episode_playlists"),
     [
         ("disc1_analysis", 3, ["00002.mpls", "00002.mpls", "00002.mpls"]),
-        ("disc2_analysis", 4, ["00002.mpls", "00002.mpls", "00002.mpls", "00002.mpls"]),
+        ("disc14_analysis", 4, ["00002.mpls", "00002.mpls", "00002.mpls", "00002.mpls"]),
         ("disc3_analysis", 4, ["00002.mpls", "00002.mpls", "00002.mpls", "00002.mpls"]),
         ("disc4_analysis", 1, ["00002.mpls"]),
         ("disc5_analysis", 1, ["00001.mpls"]),
@@ -44,7 +44,7 @@ def test_disc_episode_expectation_matrix(
     ("analysis_fixture", "expected_total", "expected_visible"),
     [  # (analysis_fixture, expected_total, expected_visible)
         ("disc1_analysis", 9, 9),  # 7 title-hint + 2 chapter-split
-        ("disc2_analysis", 0, 0),  # chapter-split disc with no extras
+        ("disc14_analysis", 0, 0),  # chapter-split disc with no extras
         ("disc3_analysis", 0, 0),  # chapter-split disc with no extras
         ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
         ("disc6_analysis", 3, 3),  # 3 title-hint specials
@@ -77,7 +77,7 @@ def test_disc_special_visibility_expectation_matrix(
     "analysis_fixture",
     [
         "disc1_analysis",
-        "disc2_analysis",
+        "disc14_analysis",
         "disc3_analysis",
         "disc4_analysis",
         "disc5_analysis",
@@ -115,7 +115,7 @@ def test_disc_episode_segment_boundaries_matrix(
     "analysis_fixture",
     [
         "disc1_analysis",
-        "disc2_analysis",
+        "disc14_analysis",
         "disc3_analysis",
         "disc4_analysis",
         "disc5_analysis",
@@ -160,7 +160,7 @@ def test_disc_special_boundary_semantics_matrix(
     ("analysis_fixture", "expected_chapter_split_specials"),
     [  # (analysis_fixture, expected_chapter_split_specials)
         ("disc1_analysis", 2),  # PlayPL_PM marks → 2 chapter-split entries
-        ("disc2_analysis", 0),
+        ("disc14_analysis", 0),
         ("disc3_analysis", 0),
         ("disc4_analysis", 0),
         ("disc5_analysis", 0),
@@ -191,7 +191,7 @@ def test_disc_special_chapter_split_expectation_matrix(
 @pytest.mark.parametrize(
     ("analysis_fixture", "expected_title"),
     [
-        ("disc2_analysis", "TEST DISC 2"),
+        ("disc14_analysis", "TEST DISC 14"),
         ("disc6_analysis", "TEST DISC 6"),
         ("disc7_analysis", "TEST DISC 7 VOL 2"),
         ("disc8_analysis", "TEST DISC 8"),
