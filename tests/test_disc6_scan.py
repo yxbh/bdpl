@@ -1,4 +1,13 @@
-"""Integration tests for disc6 fixture scan behavior (TDD expectations)."""
+"""Integration tests for disc6 fixture scan behavior (TDD expectations).
+
+Disc6 is a Gundam UC bonus disc with 2 unique episodes:
+- Clip 00006 (~58min) referenced by 4 playlist variants (00003, 00004, 00006, 00007)
+  with different audio PIDs and subtitle presence/absence.
+- Clip 00007 (~59min) referenced by 1 playlist (00005).
+
+The analysis correctly identifies 2 episodes (00003 + 00005 as representatives)
+and 3 special features (the remaining stream variants).
+"""
 
 import pytest
 
@@ -31,5 +40,10 @@ def test_disc6_last_scene_is_substantial(disc6_analysis: DiscAnalysis) -> None:
 
 
 def test_disc6_has_three_special_features(disc6_analysis: DiscAnalysis) -> None:
-    """Disc6 should expose exactly three special features."""
+    """Disc6 should expose exactly three special features (stream variants)."""
     assert len(disc6_analysis.special_features) == 3
+
+
+def test_disc6_disc_title(disc6_analysis: DiscAnalysis) -> None:
+    """Disc title should be extracted from META/DL/bdmt_eng.xml."""
+    assert disc6_analysis.disc_title == "MOBILE SUIT GUNDAM UC Blu-ray DISC 1"

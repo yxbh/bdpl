@@ -157,6 +157,7 @@ def test_disc_special_chapter_split_expectation_matrix(
     ("analysis_fixture", "expected_title"),
     [
         ("disc2_analysis", "MOBILE SUIT GUNDAM THE 08th MS TEAM DISC1"),
+        ("disc6_analysis", "MOBILE SUIT GUNDAM UC Blu-ray DISC 1"),
     ],
 )
 def test_disc_title_extraction_matrix(
