@@ -365,8 +365,15 @@ def _detect_special_features(
         if pl is None:
             continue
         category = classifications.get(mpls, "extra")
-        if category in {"episode", "play_all"}:
+        if category == "play_all":
             continue
+        # An "episode" playlist not used as an actual episode source
+        # (episodes came from play_all decomposition) is a commentary
+        # or alternate-audio track.
+        if category == "episode":
+            if mpls in ep_playlists:
+                continue
+            category = "commentary"
 
         new_features = _build_chapter_split_features(
             pl,
@@ -378,6 +385,13 @@ def _detect_special_features(
         )
         features.extend(new_features)
         idx += len(new_features)
+
+    # A special whose classification is "episode" (individual playlist that
+    # was bypassed in favour of play_all decomposition) is really a
+    # commentary / alternate-audio track, not a distinct episode.
+    for f in features:
+        if f.category == "episode":
+            f.category = "commentary"
 
     return features
 
