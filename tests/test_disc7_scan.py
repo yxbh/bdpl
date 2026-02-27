@@ -28,24 +28,18 @@ class TestDisc7Episodes:
     def test_episode1_has_four_scenes(self, disc7_analysis: DiscAnalysis) -> None:
         """Episode 1 should have 4 scenes (3 content + credits tail)."""
         ep1 = disc7_analysis.episodes[0]
-        assert len(ep1.scenes) == 4, (
-            f"Episode 1 expected 4 scenes, got {len(ep1.scenes)}"
-        )
+        assert len(ep1.scenes) == 4, f"Episode 1 expected 4 scenes, got {len(ep1.scenes)}"
 
     def test_episode2_has_four_scenes(self, disc7_analysis: DiscAnalysis) -> None:
         """Episode 2 should have 4 scenes per disc menu structure."""
         ep2 = disc7_analysis.episodes[1]
-        assert len(ep2.scenes) == 4, (
-            f"Episode 2 expected 4 scenes, got {len(ep2.scenes)}"
-        )
+        assert len(ep2.scenes) == 4, f"Episode 2 expected 4 scenes, got {len(ep2.scenes)}"
 
     def test_episode_durations_reasonable(self, disc7_analysis: DiscAnalysis) -> None:
         """Both episodes should be ~55–65 min (OVA length)."""
         for ep in disc7_analysis.episodes:
             dur_min = ep.duration_ms / 60_000
-            assert 55 < dur_min < 65, (
-                f"Ep {ep.episode} duration {dur_min:.1f}min out of range"
-            )
+            assert 55 < dur_min < 65, f"Ep {ep.episode} duration {dur_min:.1f}min out of range"
 
 
 class TestDisc7Specials:
@@ -57,9 +51,7 @@ class TestDisc7Specials:
         """Both specials should be ~3–4 min."""
         for sf in disc7_analysis.special_features:
             dur_min = sf.duration_ms / 60_000
-            assert 3 < dur_min < 5, (
-                f"Special {sf.playlist} duration {dur_min:.1f}min out of range"
-            )
+            assert 3 < dur_min < 5, f"Special {sf.playlist} duration {dur_min:.1f}min out of range"
 
 
 class TestDisc7Metadata:
