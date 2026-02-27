@@ -266,10 +266,18 @@ def order_episodes(
     if individual_eps and pa_episodes:
         avg_indiv = sum(p.duration_ms for p in individual_eps) / len(individual_eps)
         avg_pa = sum(e.duration_ms for e in pa_episodes) / len(pa_episodes) if pa_episodes else 0
-        # If Play All yields more episodes whose average duration is much
-        # longer, the individual playlists are probably extras, not episodes.
-        if len(pa_episodes) > len(individual_eps) and avg_pa > avg_indiv * 1.5:
-            return pa_episodes
+        if len(pa_episodes) > len(individual_eps):
+            # If individual episode clips are a strict subset of the
+            # play_all clips, the individual playlists only cover some
+            # episodes (the rest are play_all-only).  Use play_all.
+            indiv_clips = {pi.clip_id for p in individual_eps for pi in p.play_items}
+            pa_clips = {seg.clip_id for ep in pa_episodes for seg in ep.segments}
+            if indiv_clips <= pa_clips:
+                return pa_episodes
+            # If Play All episodes are much longer on average, the
+            # individual playlists are probably extras, not episodes.
+            if avg_pa > avg_indiv * 1.5:
+                return pa_episodes
         return _episodes_from_individual(individual_eps)
 
     if individual_eps:
