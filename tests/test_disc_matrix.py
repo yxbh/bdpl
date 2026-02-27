@@ -38,6 +38,7 @@ def test_disc_episode_expectation_matrix(
     [  # (analysis_fixture, expected_total, expected_visible)
         ("disc1_analysis", 9, 9),  # 7 title-hint + 2 chapter-split
         ("disc2_analysis", 0, 0),  # chapter-split disc with no extras
+        ("disc3_analysis", 0, 0),  # chapter-split disc with no extras
         ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
         ("disc6_analysis", 3, 3),  # 3 title-hint specials
     ],

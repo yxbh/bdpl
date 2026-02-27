@@ -15,3 +15,8 @@ def test_disc3_finds_four_episodes(disc3_analysis: DiscAnalysis) -> None:
 def test_disc3_episode_numbers_are_ordered(disc3_analysis: DiscAnalysis) -> None:
     """Verify inferred episode sequence is 1..4 for disc3."""
     assert [episode.episode for episode in disc3_analysis.episodes] == [1, 2, 3, 4]
+
+
+def test_disc3_no_special_features(disc3_analysis: DiscAnalysis) -> None:
+    """Disc3 is a chapter-split disc with no extras."""
+    assert len(disc3_analysis.special_features) == 0
