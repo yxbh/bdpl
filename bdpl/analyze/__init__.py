@@ -153,12 +153,17 @@ def _parse_disc_title(bdmv_path: Path) -> str:
 
 
 def _parse_ig_hints(bdmv_path: Path, clips: dict[str, ClipInfo], hints: dict) -> None:
-    """Try to parse IG menu streams and add hints in-place."""
-    from bdpl.bdmv.ig_stream import extract_menu_hints, parse_ig_from_m2ts
+    """Try to parse IG menu streams and add hints in-place.
 
-    stream_dir = bdmv_path / "STREAM"
-    if not stream_dir.is_dir():
-        return
+    Looks for IG streams in STREAM/*.m2ts first.  When no m2ts files are
+    available (e.g. test fixtures without media streams), falls back to a
+    pre-extracted ``ics_menu.bin`` in *bdmv_path*.
+    """
+    from bdpl.bdmv.ig_stream import (
+        extract_menu_hints,
+        parse_ics,
+        parse_ig_from_m2ts,
+    )
 
     # Find clips with IG streams (stream_type 0x91)
     ig_clips = [
@@ -169,23 +174,49 @@ def _parse_ig_hints(bdmv_path: Path, clips: dict[str, ClipInfo], hints: dict) ->
     if not ig_clips:
         return
 
-    all_ig_hints = []
-    for clip_id in ig_clips:
-        m2ts = stream_dir / f"{clip_id}.m2ts"
-        if not m2ts.is_file():
-            continue
-        ics = parse_ig_from_m2ts(m2ts)
-        if ics is None:
-            continue
-        page_hints = extract_menu_hints(ics)
-        if page_hints:
-            all_ig_hints.extend(page_hints)
-            log.debug(
-                "IG clip %s: %d pages, %d actionable buttons",
-                clip_id,
-                len(ics.pages),
-                len(page_hints),
-            )
+    all_ig_hints: list = []
+    stream_dir = bdmv_path / "STREAM"
+
+    # Primary path: demux from m2ts files
+    if stream_dir.is_dir():
+        for clip_id in ig_clips:
+            m2ts = stream_dir / f"{clip_id}.m2ts"
+            if not m2ts.is_file():
+                continue
+            ics = parse_ig_from_m2ts(m2ts)
+            if ics is None:
+                continue
+            page_hints = extract_menu_hints(ics)
+            if page_hints:
+                all_ig_hints.extend(page_hints)
+                log.debug(
+                    "IG clip %s: %d pages, %d actionable buttons",
+                    clip_id,
+                    len(ics.pages),
+                    len(page_hints),
+                )
+
+    # Fallback: pre-extracted ICS file (for test fixtures)
+    if not all_ig_hints:
+        ics_bin = bdmv_path / "ics_menu.bin"
+        if ics_bin.is_file():
+            try:
+                ic = parse_ics(ics_bin.read_bytes())
+                page_hints = extract_menu_hints(ic)
+                if page_hints:
+                    all_ig_hints.extend(page_hints)
+                    log.debug(
+                        "ICS fallback %s: %d pages, %d actionable buttons",
+                        ics_bin,
+                        len(ic.pages),
+                        len(page_hints),
+                    )
+            except Exception:
+                log.warning(
+                    "Failed to parse ICS file %s",
+                    ics_bin,
+                    exc_info=True,
+                )
 
     if all_ig_hints:
         hints["ig_menu"] = {
@@ -203,18 +234,27 @@ def _detect_special_features(
     classifications: dict[str, str],
     playlists: list[Playlist],
     episodes: list,
+    variant_mpls: set[str] | None = None,
 ) -> list[SpecialFeature]:
     """Detect special features using IG menu JumpTitle buttons + title hints.
 
-    Looks for IG buttons that JumpTitle to non-episode playlists. When a button
-    also sets reg2 (chapter index), it indicates multiple features within one
-    playlist — each gets its own SpecialFeature entry.
+    Looks for IG buttons that JumpTitle to non-episode playlists.  When a
+    button also sets reg2 (chapter index), it indicates multiple features
+    within one playlist — each gets its own SpecialFeature entry.
+
+    Additionally detects **commentary specials**: IG buttons that JumpTitle
+    to episode playlists from pages that are *not* the chapter-selection
+    page (i.e. the page where users pick which episode/chapter to play).
+    Stream-variant playlists (in *variant_mpls*) are skipped so that only
+    the representative is counted.
     """
+    if variant_mpls is None:
+        variant_mpls = set()
+
     ig_hints_raw = hints.get("ig_hints_raw", [])
     title_pl = hints.get("title_playlists", {})
 
     if not ig_hints_raw or not title_pl:
-        # Fall back to classification-only detection (no IG data)
         return _special_features_from_classifications(
             classifications,
             playlists,
@@ -222,13 +262,8 @@ def _detect_special_features(
             hints,
         )
 
-    # Build set of episode playlists to exclude
     ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
-    # Also exclude play_all playlists
-    play_all_set = set()
-    for mpls, cat in classifications.items():
-        if cat == "play_all":
-            play_all_set.add(mpls)
+    play_all_set = {mpls for mpls, cat in classifications.items() if cat == "play_all"}
 
     # Build title → playlist name mapping (0-based title index)
     title_to_mpls: dict[int, str] = {}
@@ -236,28 +271,48 @@ def _detect_special_features(
         if pl_nums:
             title_to_mpls[title_num] = f"{pl_nums[0]:05d}.mpls"
 
-    # Build playlist lookup
     pl_by_name = {pl.mpls: pl for pl in playlists}
 
-    # Find IG buttons with JumpTitle to non-episode titles.
-    # JumpTitle operand is 1-based; index titles are 0-based.
+    # --- Identify "chapter selection" JumpTitle values ----------------------
+    # A chapter-selection page has multiple buttons all targeting the *same*
+    # JumpTitle value with varying reg2 chapter indices.  JumpTitle buttons
+    # from such pages that land on episode playlists are just normal episode
+    # selection, *not* commentary features.
+    chapter_selection_jt: set[int] = set()
+    page_jt: dict[int, set[int]] = {}
+    sorted_hints = sorted(ig_hints_raw, key=lambda h: (h.page_id, h.button_id))
+    for h in sorted_hints:
+        if h.jump_title is not None:
+            page_jt.setdefault(h.page_id, set()).add(h.jump_title)
+    for _page_id, jts in page_jt.items():
+        if len(jts) == 1:
+            # All buttons on this page target the same title — this is
+            # either the main-play page or a chapter-selection page.
+            chapter_selection_jt.update(jts)
+
+    # --- Walk IG hints and build features -----------------------------------
     seen: set[tuple[str, int | None]] = set()
     features: list[SpecialFeature] = []
     idx = 1
 
-    # Sort by page then button_id for stable menu-order output
-    sorted_hints = sorted(ig_hints_raw, key=lambda h: (h.page_id, h.button_id))
-
     for h in sorted_hints:
         if h.jump_title is None:
             continue
-        # Convert 1-based JumpTitle to 0-based index title
         title_idx = h.jump_title - 1
         mpls = title_to_mpls.get(title_idx)
-        if mpls is None:
+        if mpls is None or mpls in play_all_set or mpls in variant_mpls:
             continue
-        if mpls in ep_playlists or mpls in play_all_set:
-            continue
+
+        is_episode = mpls in ep_playlists
+
+        if is_episode:
+            # Only treat as commentary if JumpTitle is NOT from a
+            # chapter-selection / main-play page.
+            if h.jump_title in chapter_selection_jt:
+                continue
+            category = "commentary"
+        else:
+            category = classifications.get(mpls, "extra")
 
         ch_start = h.register_sets.get(2)
         key = (mpls, ch_start)
@@ -269,16 +324,12 @@ def _detect_special_features(
         if pl is None:
             continue
 
-        category = classifications.get(mpls, "extra")
-
-        # Calculate duration for chapter-split features
         dur_ms = pl.duration_ms
         if ch_start is not None and pl.chapters and len(pl.chapters) > 1:
             ch_times = [ticks_to_ms(ch.timestamp) for ch in pl.chapters]
             end_ms = ticks_to_ms(pl.play_items[-1].out_time)
             if ch_start < len(ch_times):
                 start_ms = ch_times[ch_start]
-                # Find next chapter-start for this same playlist
                 next_start = None
                 for h2 in sorted_hints:
                     if h2.jump_title != h.jump_title:
@@ -304,12 +355,12 @@ def _detect_special_features(
         )
         idx += 1
 
-    # Supplement direct IG-derived features with title-hint specials when
-    # menus jump via intermediate logic and only expose a subset of targets.
+    # Supplement with title-hint specials not already covered by IG buttons.
     title_hint_entries = _title_hint_non_episode_entries(hints, classifications, episodes)
     existing_keys = {(feature.playlist, feature.chapter_start) for feature in features}
-    pl_by_name = {pl.mpls: pl for pl in playlists}
     for mpls, chapter_starts in title_hint_entries:
+        if mpls in variant_mpls:
+            continue
         pl = pl_by_name.get(mpls)
         if pl is None:
             continue
@@ -1111,6 +1162,7 @@ def scan_disc(
         classifications,
         playlists,
         episodes,
+        variant_mpls=variant_mpls,
     )
 
     # 9. Build scene-level episode segments from menu/chapter markers.

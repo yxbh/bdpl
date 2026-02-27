@@ -45,7 +45,7 @@ def test_disc_episode_expectation_matrix(
         ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
         ("disc6_analysis", 3, 3),  # 3 title-hint specials
         ("disc7_analysis", 2, 2),  # 2 title-hint specials (stream variants)
-        ("disc8_analysis", 2, 2),  # 2 title-hint specials (stream variants)
+        ("disc8_analysis", 3, 3),  # 2 commentaries + 1 lyrics ending
         ("disc9_analysis", 1, 1),  # alt-audio variant detected as special
     ],
 )

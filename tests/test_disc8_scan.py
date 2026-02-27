@@ -5,8 +5,10 @@ to disc7:
 - Episode 1 (00003.mpls, clip 00006): ~54 min, 4 scenes
 - Episode 2 (00004.mpls, clips 00007+00010): ~60 min, 4 scenes
 
-Two specials are detected (00005.mpls + 00006.mpls) — stream variants of
-the same clip (00009, ~5.2 min) with different audio tracks.
+Three specials are detected via IG menu analysis:
+- 2 commentary tracks (JumpTitle to episode playlists from special feature pages)
+- 1 lyrics credit ending (00005.mpls, ~5.2 min; 00006.mpls is a stream
+  variant with different audio and is automatically excluded)
 """
 
 import pytest
@@ -44,12 +46,27 @@ class TestDisc8Episodes:
 
 class TestDisc8Specials:
     def test_special_count(self, disc8_analysis: DiscAnalysis) -> None:
-        """Disc8 should have 2 specials (stream variants of same clip)."""
-        assert len(disc8_analysis.special_features) == 2
+        """Disc8 should have 3 specials (2 commentary + 1 lyrics ending)."""
+        assert len(disc8_analysis.special_features) == 3
+
+    def test_commentaries_detected(self, disc8_analysis: DiscAnalysis) -> None:
+        """Two commentary specials should reference the episode playlists."""
+        commentaries = [sf for sf in disc8_analysis.special_features if sf.category == "commentary"]
+        assert len(commentaries) == 2
+        assert {c.playlist for c in commentaries} == {"00003.mpls", "00004.mpls"}
+
+    def test_lyrics_ending_detected(self, disc8_analysis: DiscAnalysis) -> None:
+        """One non-commentary special (lyrics credit ending) on 00005.mpls."""
+        non_commentary = [
+            sf for sf in disc8_analysis.special_features if sf.category != "commentary"
+        ]
+        assert len(non_commentary) == 1
+        assert non_commentary[0].playlist == "00005.mpls"
 
     def test_specials_are_short(self, disc8_analysis: DiscAnalysis) -> None:
-        """Both specials should be ~4–6 min."""
-        for sf in disc8_analysis.special_features:
+        """The lyrics ending special should be ~4–6 min."""
+        lyrics = [sf for sf in disc8_analysis.special_features if sf.category != "commentary"]
+        for sf in lyrics:
             dur_min = sf.duration_ms / 60_000
             assert 4 < dur_min < 7, f"Special {sf.playlist} duration {dur_min:.1f}min out of range"
 
