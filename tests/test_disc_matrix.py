@@ -37,6 +37,7 @@ def test_disc_episode_expectation_matrix(
     ("analysis_fixture", "expected_total", "expected_visible"),
     [  # (analysis_fixture, expected_total, expected_visible)
         ("disc1_analysis", 9, 9),  # 7 title-hint + 2 chapter-split
+        ("disc2_analysis", 0, 0),  # chapter-split disc with no extras
         ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
         ("disc6_analysis", 3, 3),  # 3 title-hint specials
     ],
@@ -149,3 +150,19 @@ def test_disc_special_chapter_split_expectation_matrix(
         1 for feature in analysis.special_features if feature.chapter_start is not None
     )
     assert chapter_split == expected_chapter_split_specials
+
+
+@pytest.mark.parametrize(
+    ("analysis_fixture", "expected_title"),
+    [
+        ("disc2_analysis", "MOBILE SUIT GUNDAM THE 08th MS TEAM DISC1"),
+    ],
+)
+def test_disc_title_extraction_matrix(
+    request: pytest.FixtureRequest,
+    analysis_fixture: str,
+    expected_title: str,
+) -> None:
+    """Validate disc title extraction from META/DL/bdmt_eng.xml."""
+    analysis: DiscAnalysis = request.getfixturevalue(analysis_fixture)
+    assert analysis.disc_title == expected_title

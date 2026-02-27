@@ -388,6 +388,23 @@ def _build_chapter_split_features(
     return features
 
 
+def _nav_playlists_from_hints(hints: dict) -> set[str]:
+    """Return playlists used by first_playback or top_menu movie objects.
+
+    These are navigation playlists (disc intro, menu background) and should
+    not be treated as special features.
+    """
+    index_hints = hints.get("index", {})
+    obj_pl = hints.get("movie_objects", {}).get("obj_playlists", {})
+    nav: set[str] = set()
+    for key in ("first_playback_obj", "top_menu_obj"):
+        obj_id = index_hints.get(key)
+        if obj_id is not None:
+            for pl_num in obj_pl.get(obj_id, []):
+                nav.add(f"{pl_num:05d}.mpls")
+    return nav
+
+
 def _title_hint_non_episode_entries(
     hints: dict,
     classifications: dict[str, str],
@@ -554,6 +571,7 @@ def _special_features_from_classifications(
 ) -> list[SpecialFeature]:
     """Fallback: build special features list from playlist classifications."""
     ep_playlists = {ep.playlist for ep in episodes} if episodes else set()
+    nav_playlists = _nav_playlists_from_hints(hints or {})
     pl_by_name = {pl.mpls: pl for pl in playlists}
     features: list[SpecialFeature] = []
     idx = 1
@@ -584,6 +602,8 @@ def _special_features_from_classifications(
     non_episode_cats = {"creditless_op", "creditless_ed", "extra", "digital_archive"}
     for mpls, cat in sorted(classifications.items()):
         if cat not in non_episode_cats or mpls in ep_playlists:
+            continue
+        if mpls in nav_playlists:
             continue
         pl = pl_by_name.get(mpls)
         if pl is None:
