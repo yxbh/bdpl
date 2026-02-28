@@ -310,11 +310,26 @@ def _detect_special_features(
             # chapter-selection / main-play page.
             if h.jump_title in chapter_selection_jt:
                 continue
+            # Skip if this page also has buttons targeting non-episode
+            # playlists — the episode button is likely navigation (e.g.
+            # "back to movie") rather than a commentary feature.
+            page_has_non_ep_target = any(
+                title_to_mpls.get(jt_val - 1) not in ep_playlists
+                for jt_val in page_jt.get(h.page_id, set())
+                if title_to_mpls.get(jt_val - 1) is not None
+            )
+            if page_has_non_ep_target:
+                continue
             category = "commentary"
         else:
             category = classifications.get(mpls, "extra")
 
         ch_start = h.register_sets.get(2)
+        # For digital_archive playlists, ch_start=0 means "play from
+        # beginning" — normalise to None so it deduplicates with the
+        # title-hint fallback entry for the whole playlist.
+        if category == "digital_archive" and ch_start == 0:
+            ch_start = None
         key = (mpls, ch_start)
         if key in seen:
             continue
@@ -864,6 +879,7 @@ def _maybe_collapse_variant_episodes(
     episodes: list[Episode],
     playlists: list[Playlist],
     variant_mpls: set[str],
+    all_playlists: list[Playlist] | None = None,
 ) -> list[Episode]:
     """Collapse chapter-split episodes back to one when variant dedup caused it.
 
@@ -896,6 +912,18 @@ def _maybe_collapse_variant_episodes(
     playlist = next((p for p in playlists if p.mpls == playlist_name), None)
     if playlist is None:
         return episodes
+
+    # Only collapse when a removed variant actually shares clips with the
+    # episode playlist.  Unrelated variant groups (e.g. duplicate specials)
+    # should not trigger a collapse.
+    if all_playlists and playlist.play_items:
+        ep_clips = {pi.clip_id for pi in playlist.play_items}
+        has_related_variant = any(
+            pl.mpls in variant_mpls and any(pi.clip_id in ep_clips for pi in pl.play_items)
+            for pl in all_playlists
+        )
+        if not has_related_variant:
+            return episodes
 
     segments = [
         SegmentRef(
@@ -1075,11 +1103,20 @@ def scan_disc(
     label_segments(unique_playlists, segment_freq)
 
     # 5. Classify playlists
-    classifications = classify_playlists(unique_playlists, play_all)
+    title_hint_mpls: set[str] = set()
+    for pl_nums in hints.get("title_playlists", {}).values():
+        for n in pl_nums:
+            title_hint_mpls.add(f"{n:05d}.mpls")
+    classifications = classify_playlists(
+        unique_playlists, play_all, title_hint_mpls=title_hint_mpls
+    )
     analysis["classifications"] = classifications
 
     # 6. Order episodes
-    episodes = order_episodes(unique_playlists, play_all, classifications)
+    ig_marks = hints.get("ig_menu", {}).get("chapter_marks")
+    episodes = order_episodes(
+        unique_playlists, play_all, classifications, ig_chapter_marks=ig_marks
+    )
 
     episodes = _maybe_keep_single_title_episode(
         episodes,
@@ -1094,6 +1131,7 @@ def scan_disc(
         episodes,
         unique_playlists,
         variant_mpls,
+        all_playlists=playlists,
     )
 
     # If episodes came from Play All decomposition, reclassify playlists

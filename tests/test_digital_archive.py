@@ -11,6 +11,7 @@ from bdpl.export.digital_archive import (
     export_digital_archive_images,
     get_digital_archive_dry_run,
 )
+from bdpl.model import StreamInfo
 from tests.builders import (
     build_disc_analysis,
     build_play_item,
@@ -27,8 +28,12 @@ def test_digital_archive_playlist_detected_from_structure() -> None:
 
 
 def test_digital_archive_playlist_rejects_low_item_count() -> None:
-    """Few short items should not trigger digital archive classification."""
+    """Few short items with audio should not trigger digital archive classification."""
     items = [build_play_item(f"{i:05d}", 0.0, 0.04) for i in range(10)]
+    # Add audio streams so the no-audio signal does not lower the threshold.
+    audio = StreamInfo(pid=0x1100, stream_type=128, codec="LPCM", lang="jpn")
+    for item in items:
+        item.streams = [audio]
     pl = build_playlist("00003.mpls", items)
     assert not is_digital_archive_playlist(pl)
 

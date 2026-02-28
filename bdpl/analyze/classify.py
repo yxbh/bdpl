@@ -12,19 +12,58 @@ _EPISODE_MIN = 600  # 10 minutes
 _PREVIEW_MAX = 60
 _BODY_MIN_S = 300  # 5 minutes
 _DIGITAL_ARCHIVE_MIN_ITEMS = 20
+_DIGITAL_ARCHIVE_HINT_MIN_ITEMS = 5
 _DIGITAL_ARCHIVE_MAX_TOTAL_S = 300
 _DIGITAL_ARCHIVE_MAX_AVG_ITEM_S = 0.5
 _DIGITAL_ARCHIVE_MIN_UNIQUE_RATIO = 0.8
+_DIGITAL_ARCHIVE_NO_AUDIO_RATIO = 0.8
+_AUDIO_CODECS = frozenset(
+    {
+        "LPCM",
+        "AC3",
+        "E-AC3",
+        "DTS",
+        "DTS-HD",
+        "DTS-HD MA",
+        "TrueHD",
+    }
+)
 
 
-def is_digital_archive_playlist(pl: Playlist) -> bool:
+def _items_lack_audio(pl: Playlist) -> bool:
+    """Return True when most play items have no audio streams (still images)."""
+    if not pl.play_items:
+        return False
+    no_audio = sum(
+        1 for pi in pl.play_items if not any(s.codec in _AUDIO_CODECS for s in pi.streams)
+    )
+    return no_audio / len(pl.play_items) >= _DIGITAL_ARCHIVE_NO_AUDIO_RATIO
+
+
+def is_digital_archive_playlist(
+    pl: Playlist,
+    *,
+    has_title_hint: bool = False,
+) -> bool:
     """Return True when playlist shape resembles an image archive.
 
-    Heuristic targets menu-like playlists made of many ultra-short items
-    (often one still image per clip) and avoids short video extras.
+    Three independent signals lower the item-count floor when combined
+    with the base shape checks (avg duration ≤ 0.5 s, unique ratio ≥ 0.8):
+
+    1. **Item count ≥ 20** — strong shape signal, sufficient alone.
+    2. **Title hint** — disc navigation references the playlist as real
+       content.  Lowers floor to 5 items.
+    3. **No audio streams** — play items contain only video (+ IG overlay),
+       characteristic of still-image galleries.  Lowers floor to 5 items.
     """
     item_count = len(pl.play_items)
-    if item_count < _DIGITAL_ARCHIVE_MIN_ITEMS:
+
+    # Determine minimum item threshold based on available evidence.
+    has_structural_evidence = has_title_hint or _items_lack_audio(pl)
+    min_items = (
+        _DIGITAL_ARCHIVE_HINT_MIN_ITEMS if has_structural_evidence else _DIGITAL_ARCHIVE_MIN_ITEMS
+    )
+    if item_count < min_items:
         return False
 
     total_s = pl.duration_seconds
@@ -110,13 +149,23 @@ def label_segments(playlists: list[Playlist], segment_freq: dict[tuple, int]) ->
             pi.label = "UNKNOWN"
 
 
-def classify_playlists(playlists: list[Playlist], play_all: list[Playlist]) -> dict[str, str]:
+def classify_playlists(
+    playlists: list[Playlist],
+    play_all: list[Playlist],
+    title_hint_mpls: set[str] | None = None,
+) -> dict[str, str]:
     """Return dict mpls_name -> category string.
+
+    Parameters:
+        title_hint_mpls: MPLS names referenced by disc title navigation
+            hints.  Used as structural evidence for digital archive
+            detection when the item count is below the strict threshold.
 
     Categories: 'episode', 'play_all', 'menu', 'extra', 'bumper',
     'creditless_op', 'creditless_ed', 'digital_archive'.
     """
     play_all_names = {pl.mpls for pl in play_all}
+    hint_names = title_hint_mpls or set()
     result: dict[str, str] = {}
 
     for pl in playlists:
@@ -126,7 +175,7 @@ def classify_playlists(playlists: list[Playlist], play_all: list[Playlist]) -> d
             result[pl.mpls] = "play_all"
             continue
 
-        if is_digital_archive_playlist(pl):
+        if is_digital_archive_playlist(pl, has_title_hint=pl.mpls in hint_names):
             result[pl.mpls] = "digital_archive"
             continue
 
