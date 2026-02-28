@@ -106,11 +106,17 @@ def _episodes_from_play_all(
 
 def _episodes_from_chapters(
     playlist: Playlist,
+    ig_chapter_marks: list[int] | None = None,
 ) -> list[Episode]:
     """Split a single long playlist into episodes using chapter marks.
 
     Used when a playlist contains one (or few) very long play item(s) with
     multiple episodes encoded back-to-back, distinguishable only by chapters.
+
+    When *ig_chapter_marks* are provided (from IG menu buttons), they serve as
+    structural confirmation that the playlist contains multiple episodes.
+    Without such evidence, a minimum of 3 estimated episodes is required —
+    an ``est_count`` of 2 is ambiguous (could be a single ~50 min movie).
 
     Heuristic: group consecutive chapters into blocks whose total duration
     falls within episode range (10–45 min). When a running block exceeds the
@@ -138,6 +144,13 @@ def _episodes_from_chapters(
 
     if est_count <= 1:
         return []  # Not worth splitting
+
+    # IG chapter marks provide structural evidence of multiple episodes.
+    # Without such evidence, require est_count >= 3 because est_count == 2
+    # (~50 min total) is ambiguous — could be a single movie.
+    has_ig_confirmation = ig_chapter_marks is not None and len(ig_chapter_marks) >= 2
+    if est_count <= 2 and not has_ig_confirmation:
+        return []
 
     # Target duration per episode
     target_dur_ms = total_dur_ms / est_count
@@ -222,8 +235,13 @@ def order_episodes(
     playlists: list[Playlist],
     play_all_playlists: list[Playlist],
     classifications: dict[str, str] | None = None,
+    ig_chapter_marks: list[int] | None = None,
 ) -> list[Episode]:
     """Infer ordered episode list.
+
+    Parameters:
+        ig_chapter_marks: Chapter indices from IG menu buttons that confirm
+            episode boundaries.  Passed through to chapter-splitting logic.
 
     Strategy:
     1. If there are individual episode-length playlists (>10 min, not in
@@ -255,7 +273,7 @@ def order_episodes(
         pa_episodes = _episodes_from_play_all(best_pa)
         # If play-all decomposition yields only 1 episode, try chapter-based
         if len(pa_episodes) <= 1 and best_pa.chapters:
-            ch_episodes = _episodes_from_chapters(best_pa)
+            ch_episodes = _episodes_from_chapters(best_pa, ig_chapter_marks)
             if len(ch_episodes) > len(pa_episodes):
                 pa_episodes = ch_episodes
 
@@ -285,7 +303,7 @@ def order_episodes(
         # it likely contains multiple episodes in a single m2ts
         if len(individual_eps) == 1:
             candidate = individual_eps[0]
-            ch_episodes = _episodes_from_chapters(candidate)
+            ch_episodes = _episodes_from_chapters(candidate, ig_chapter_marks)
             if len(ch_episodes) >= 2:
                 return ch_episodes
         return _episodes_from_individual(individual_eps)
