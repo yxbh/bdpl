@@ -15,7 +15,6 @@ Expects a list of (iso_name, bdmv_path) tuples for already-mounted discs.
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -115,9 +114,7 @@ def _extract_ig_pages(ig_raw: list) -> list[dict]:
     return result
 
 
-def _ig_cross_check(
-    ig_pages: list[dict], ep_count: int, sp_count: int
-) -> tuple[str, str]:
+def _ig_cross_check(ig_pages: list[dict], ep_count: int, sp_count: int) -> tuple[str, str]:
     """
     Compare IG page button counts against detected episode/special counts.
 
@@ -137,8 +134,7 @@ def _ig_cross_check(
     notes = []
     for page in ig_pages:
         notes.append(
-            f"p{page['page_id']}: {page['buttons']} btns, "
-            f"{page['unique_targets']} unique targets"
+            f"p{page['page_id']}: {page['buttons']} btns, {page['unique_targets']} unique targets"
         )
 
     # Simple match check: is there a page with unique_targets == ep_count?
@@ -148,9 +144,7 @@ def _ig_cross_check(
 
     # Check if any page is close (off by 1, which can happen with
     # "play all" button being counted)
-    close_match = any(
-        abs(p["unique_targets"] - ep_count) <= 1 for p in ig_pages
-    )
+    close_match = any(abs(p["unique_targets"] - ep_count) <= 1 for p in ig_pages)
     if close_match:
         return "ok", "; ".join(notes) + " (close match)"
 
@@ -167,16 +161,13 @@ def format_report(reports: list[DiscReport], start_disc: int) -> str:
 
     # Summary table
     match_icons = {"ok": "✅", "warn": "⚠️", "mismatch": "❌"}
-    lines.append(
-        f"{'#':<5} {'ISO':<30} {'Eps':>4} {'Spc':>4} {'IG':>3} Notes"
-    )
+    lines.append(f"{'#':<5} {'ISO':<30} {'Eps':>4} {'Spc':>4} {'IG':>3} Notes")
     lines.append("-" * 72)
     for i, r in enumerate(reports):
         disc_n = start_disc + i
         icon = match_icons.get(r.ig_match, "?")
         lines.append(
-            f"d{disc_n:<4} {r.iso_name:<30} {r.episodes:>4} "
-            f"{r.specials:>4}  {icon}  {r.ig_note}"
+            f"d{disc_n:<4} {r.iso_name:<30} {r.episodes:>4} {r.specials:>4}  {icon}  {r.ig_note}"
         )
 
     # Episode details
@@ -187,8 +178,7 @@ def format_report(reports: list[DiscReport], start_disc: int) -> str:
         disc_n = start_disc + i
         if r.episode_details:
             eps = " | ".join(
-                f"ep{e['num']}: {e['playlist']} {e['duration_min']}min"
-                for e in r.episode_details
+                f"ep{e['num']}: {e['playlist']} {e['duration_min']}min" for e in r.episode_details
             )
             lines.append(f"  disc{disc_n}: {eps}")
 
@@ -200,8 +190,7 @@ def format_report(reports: list[DiscReport], start_disc: int) -> str:
         disc_n = start_disc + i
         if r.special_details:
             sps = " | ".join(
-                f"#{s['index']}: {s['playlist']} {s['category']} "
-                f"{s['duration_min']}min"
+                f"#{s['index']}: {s['playlist']} {s['category']} {s['duration_min']}min"
                 for s in r.special_details
             )
             lines.append(f"  disc{disc_n}: {sps}")
@@ -213,9 +202,7 @@ def format_report(reports: list[DiscReport], start_disc: int) -> str:
     for i, r in enumerate(reports):
         disc_n = start_disc + i
         if r.classifications:
-            cls_str = ", ".join(
-                f"{k}: {v}" for k, v in sorted(r.classifications.items())
-            )
+            cls_str = ", ".join(f"{k}: {v}" for k, v in sorted(r.classifications.items()))
             lines.append(f"  disc{disc_n}: {cls_str}")
 
     lines.append("")

@@ -157,18 +157,26 @@ def _detect_episode_periodicity(
                 if len(group) < 3:
                     continue
 
+                # OP: first chapter, or second if first is a short preamble
                 op_ok = _OP_MIN_S <= group[0] <= _OP_MAX_S
+                if not op_ok and len(group) >= 4 and group[0] < _OP_MIN_S:
+                    op_ok = _OP_MIN_S <= group[1] <= _OP_MAX_S
                 body_ok = any(d > _BODY_MIN_S_CH for d in group[1:-1])
-                ed_ok = (_ED_MIN_S <= group[-1] <= _ED_MAX_S) or (
-                    len(group) >= 3 and _ED_MIN_S <= group[-2] <= _ED_MAX_S
+                # ED: within last 3 positions (covers trailing preview/transition)
+                ed_ok = any(
+                    _ED_MIN_S <= group[-(i + 1)] <= _ED_MAX_S for i in range(min(3, len(group) - 1))
                 )
 
                 if op_ok and body_ok and ed_ok:
                     groups_matched += 1
 
-            if n_groups >= 2:
+            if n_groups >= 2 and groups_matched >= 2:
                 score = groups_matched / n_groups
-                if score >= 0.75:
+                # Majority rule: more groups match than don't.  A simple
+                # majority is structural evidence rather than a magic
+                # threshold.  Series finales often drop OP/ED, making one
+                # group fail without invalidating the overall pattern.
+                if groups_matched * 2 > n_groups:
                     if best is None or score > best[2] or (score == best[2] and n_groups > best[1]):
                         best = (period, n_groups, score)
 
@@ -374,13 +382,13 @@ def order_episodes(
         return _episodes_from_individual(individual_eps)
 
     if individual_eps:
-        # Strategy 3: if only one "episode" but it's very long with chapters,
-        # it likely contains multiple episodes in a single m2ts
-        if len(individual_eps) == 1:
-            candidate = individual_eps[0]
-            ch_episodes = _episodes_from_chapters(candidate, ig_chapter_marks)
-            if len(ch_episodes) >= 2:
-                return ch_episodes
+        # Try chapter-splitting the longest playlist.  If structural
+        # evidence (IG marks or periodicity) confirms it's a compilation,
+        # its split episodes are better than one massive "episode" entry.
+        longest = max(individual_eps, key=lambda p: p.duration_ms)
+        ch_episodes = _episodes_from_chapters(longest, ig_chapter_marks)
+        if len(ch_episodes) >= 2:
+            return ch_episodes
         return _episodes_from_individual(individual_eps)
 
     if pa_episodes:
