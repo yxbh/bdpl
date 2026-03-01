@@ -18,7 +18,7 @@ class TestDisc21Episodes:
 
     def test_episode_duration(self, disc21_analysis: DiscAnalysis) -> None:
         dur_min = disc21_analysis.episodes[0].duration_ms / 60000
-        assert 40 < dur_min < 50, f"OVA duration {dur_min:.1f}min out of range"
+        assert 44.0 < dur_min < 44.2, f"OVA duration {dur_min:.2f}min, expected ~44:03"
 
 
 class TestDisc21Specials:
