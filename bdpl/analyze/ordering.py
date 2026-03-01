@@ -104,6 +104,77 @@ def _episodes_from_play_all(
     return episodes
 
 
+def _chapter_durations_s(playlist: Playlist) -> list[float]:
+    """Return chapter durations in seconds for a playlist."""
+    ch_times = [ticks_to_ms(ch.timestamp) for ch in playlist.chapters]
+    total_ms = playlist.duration_ms
+    durs: list[float] = []
+    for i in range(len(ch_times)):
+        end = ch_times[i + 1] if i + 1 < len(ch_times) else total_ms
+        durs.append((end - ch_times[i]) / 1000)
+    return durs
+
+
+# Anime episode chapter structure ranges (in seconds)
+_OP_MIN_S, _OP_MAX_S = 45, 160  # opening theme
+_BODY_MIN_S_CH = 180  # body segment (scene)
+_ED_MIN_S, _ED_MAX_S = 45, 160  # ending theme
+
+
+def _detect_episode_periodicity(
+    ch_durs_s: list[float],
+) -> tuple[int, int, float] | None:
+    """Detect repeating episode structure in chapter durations.
+
+    Anime episode compilations embed a fixed structure per episode:
+    OP (~90 s) → Body segments → ED (~90 s) [→ Preview (~30 s)].  This
+    creates a periodic pattern visible in the chapter durations.
+
+    Tries periods 4–7 (chapters per episode).  For each candidate period,
+    partitions chapters into groups and checks whether each group matches
+    the expected structure (OP-length first chapter, at least one long body
+    chapter, ED-length chapter near the end).
+
+    Returns ``(period, n_episodes, confidence)`` for the best match, where
+    *confidence* is the fraction of groups that match.  Returns ``None``
+    when no period achieves ≥ 75 % match with ≥ 2 groups.
+    """
+    n = len(ch_durs_s)
+    best: tuple[int, int, float] | None = None
+
+    for period in range(4, 8):
+        # Allow total chapters to be within ±1 of period × n_groups
+        for n_groups in range(2, n // period + 2):
+            total_expected = n_groups * period
+            if abs(total_expected - n) > 1:
+                continue
+
+            groups_matched = 0
+            for g in range(n_groups):
+                start = g * period
+                end = min(start + period, n)
+                group = ch_durs_s[start:end]
+                if len(group) < 3:
+                    continue
+
+                op_ok = _OP_MIN_S <= group[0] <= _OP_MAX_S
+                body_ok = any(d > _BODY_MIN_S_CH for d in group[1:-1])
+                ed_ok = (_ED_MIN_S <= group[-1] <= _ED_MAX_S) or (
+                    len(group) >= 3 and _ED_MIN_S <= group[-2] <= _ED_MAX_S
+                )
+
+                if op_ok and body_ok and ed_ok:
+                    groups_matched += 1
+
+            if n_groups >= 2:
+                score = groups_matched / n_groups
+                if score >= 0.75:
+                    if best is None or score > best[2] or (score == best[2] and n_groups > best[1]):
+                        best = (period, n_groups, score)
+
+    return best
+
+
 def _episodes_from_chapters(
     playlist: Playlist,
     ig_chapter_marks: list[int] | None = None,
@@ -113,44 +184,48 @@ def _episodes_from_chapters(
     Used when a playlist contains one (or few) very long play item(s) with
     multiple episodes encoded back-to-back, distinguishable only by chapters.
 
-    When *ig_chapter_marks* are provided (from IG menu buttons), they serve as
-    structural confirmation that the playlist contains multiple episodes.
-    Without such evidence, a minimum of 3 estimated episodes is required —
-    an ``est_count`` of 2 is ambiguous (could be a single ~50 min movie).
+    **Decision to split** requires positive structural evidence from at least
+    one of two signals:
 
-    Heuristic: group consecutive chapters into blocks whose total duration
-    falls within episode range (10–45 min). When a running block exceeds the
-    expected episode length, start a new episode at the chapter boundary.
+    1. **IG chapter marks** — buttons in the disc menu directly encode episode
+       start chapters (e.g. reg2 = [0, 5, 10, 15]).  Definitive.
+    2. **Chapter periodicity** — chapter durations show a repeating
+       OP / body / ED cycle characteristic of anime episode compilations.
+
+    Without either signal the playlist is assumed to be a single movie or OVA
+    and is *not* split, regardless of total duration.
+
+    Splitting uses a greedy algorithm that groups consecutive chapters into
+    blocks whose total duration approaches the target episode length.
     """
     if not playlist.chapters or len(playlist.chapters) < 4:
         return []
 
-    # Only consider chapters on the main play item (item_ref=0 typically)
-    # Build list of (chapter_index, start_time_ms)
     main_item = playlist.play_items[0]
-    ticks_to_ms(main_item.in_time)
 
     ch_times: list[float] = []
     for ch in playlist.chapters:
-        ch_ms = ticks_to_ms(ch.timestamp)
-        ch_times.append(ch_ms)
+        ch_times.append(ticks_to_ms(ch.timestamp))
 
-    # Compute total playlist duration
     total_dur_ms = playlist.duration_ms
-    # Estimate episode count from total duration
-    # Typical anime episode: 22–26 min; try to find the best fit
     est_ep_dur_ms = 25 * 60 * 1000  # 25 minutes as starting estimate
     est_count = max(1, round(total_dur_ms / est_ep_dur_ms))
 
     if est_count <= 1:
         return []  # Not worth splitting
 
-    # IG chapter marks provide structural evidence of multiple episodes.
-    # Without such evidence, require est_count >= 3 because est_count == 2
-    # (~50 min total) is ambiguous — could be a single movie.
+    # --- Require positive structural evidence before splitting ---
     has_ig_confirmation = ig_chapter_marks is not None and len(ig_chapter_marks) >= 2
-    if est_count <= 2 and not has_ig_confirmation:
-        return []
+    if not has_ig_confirmation:
+        ch_durs = _chapter_durations_s(playlist)
+        periodicity = _detect_episode_periodicity(ch_durs)
+        if periodicity is None:
+            return []  # No structural evidence of episodes
+        # Use the detected episode count from periodicity when it differs
+        # from the duration-based estimate.
+        _, periodic_count, _ = periodicity
+        if abs(periodic_count - est_count) <= 1:
+            est_count = periodic_count
 
     # Target duration per episode
     target_dur_ms = total_dur_ms / est_count

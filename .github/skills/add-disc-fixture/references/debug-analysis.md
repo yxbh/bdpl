@@ -121,3 +121,44 @@ for h in sorted(ig_raw, key=lambda x: (x.page_id, x.button_id)):
 - **Multi-feature playlists** with register-based chapter selection
   (SET reg2 before JumpTitle) are supported, but only when `imm_op2=True`
   (immediate value). Register-indirect chapter indices are not resolved.
+
+## How to Fix Mismatches — Structural Signals, Not Thresholds
+
+When analysis returns wrong counts, resist the urge to add a numeric
+threshold or ratio guard that fixes the immediate disc.  Thresholds are
+"just happens to work" — they break on the next disc.
+
+### The right process
+
+1. **Dump data across fixtures** — compare the failing disc against
+   fixtures that work.  Key data to examine:
+   - Chapter durations (look for repeating OP/body/ED cycles)
+   - IG menu buttons per page (episode pages ~5 buttons, scene grids ~10)
+   - IG chapter marks (JT + reg2 patterns)
+   - Segment labels, play item structure, title counts
+
+2. **Find a structural signal** — something the disc data says about
+   itself.  Ask: "What makes the working discs structurally different
+   from the failing disc?"
+
+3. **Require positive evidence** — the code should ask "does the data
+   say this IS an episode compilation?" not "does the data say this is
+   NOT a movie?".  Positive detection produces zero false positives
+   when the signal is absent.
+
+4. **Validate across ALL fixtures** — run the new logic against every
+   fixture, not just the one that broke.
+
+### Anti-patterns to avoid
+
+- `if count <= N: return []` — arbitrary threshold, will break
+- `if ratio > X: return []` — same problem
+- Lowering/raising an existing threshold to accommodate one more disc
+- Any fix that only looks at the failing disc without comparing others
+
+### Example: Chapter-split detection
+
+Bad (threshold): `if chapters_per_episode > 7: don't split`
+Good (structural): detect repeating OP/body/ED chapter cycle via
+`_detect_episode_periodicity()` — only split when positive evidence
+of episode structure exists.
