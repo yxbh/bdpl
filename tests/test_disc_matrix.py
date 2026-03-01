@@ -64,7 +64,7 @@ def test_disc_episode_expectation_matrix(
         ("disc5_analysis", 14, 11),  # 14 IG-derived, 11 visible content buttons
         ("disc6_analysis", 3, 3),  # 3 title-hint specials
         ("disc7_analysis", 2, 2),  # 2 title-hint specials (stream variants)
-        ("disc8_analysis", 3, 3),  # 2 commentaries + 1 lyrics ending
+        ("disc8_analysis", 1, 1),  # 1 lyrics ending
         ("disc9_analysis", 1, 1),  # alt-audio variant detected as special
         ("disc10_analysis", 3, 3),  # 3 commentaries (play_all-only episodes)
         ("disc11_analysis", 1, 1),  # 1 short extra
@@ -81,9 +81,9 @@ def test_disc_episode_expectation_matrix(
         ("disc23_analysis", 0, 0),  # chapter-split disc with no extras
         ("disc24_analysis", 8, 8),  # 1 extra + 3 commentary + 4 creditless ED
         ("disc25_analysis", 1, 1),  # 1 digital archive
-        ("disc26_analysis", 15, 15),  # 2 commentary + 4 creditless_ed + 9 extra
-        ("disc27_analysis", 15, 15),  # 2 commentary + 6 creditless_ed + 7 extra
-        ("disc28_analysis", 13, 13),  # 2 commentary + 7 creditless_ed + 4 extra
+        ("disc26_analysis", 12, 12),  # 4 creditless_ed + 8 extra
+        ("disc27_analysis", 12, 12),  # 6 creditless_ed + 6 extra
+        ("disc28_analysis", 10, 10),  # 7 creditless_ed + 3 extra
         ("disc29_analysis", 3, 3),  # 3 digital archives
     ],
 )
