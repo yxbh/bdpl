@@ -292,6 +292,54 @@ def disc21_analysis(disc21_path):
     return _analyze_fixture(disc21_path)
 
 
+@pytest.fixture(scope="session")
+def disc22_path() -> Path:
+    """Return path to bundled disc22 fixture."""
+    return _fixture_path("disc22")
+
+
+@pytest.fixture(scope="session")
+def disc22_analysis(disc22_path):
+    """Run and cache full analysis for the bundled disc22 fixture."""
+    return _analyze_fixture(disc22_path)
+
+
+@pytest.fixture(scope="session")
+def disc23_path() -> Path:
+    """Return path to bundled disc23 fixture."""
+    return _fixture_path("disc23")
+
+
+@pytest.fixture(scope="session")
+def disc23_analysis(disc23_path):
+    """Run and cache full analysis for the bundled disc23 fixture."""
+    return _analyze_fixture(disc23_path)
+
+
+@pytest.fixture(scope="session")
+def disc24_path() -> Path:
+    """Return path to bundled disc24 fixture."""
+    return _fixture_path("disc24")
+
+
+@pytest.fixture(scope="session")
+def disc24_analysis(disc24_path):
+    """Run and cache full analysis for the bundled disc24 fixture."""
+    return _analyze_fixture(disc24_path)
+
+
+@pytest.fixture(scope="session")
+def disc25_path() -> Path:
+    """Return path to bundled disc25 fixture."""
+    return _fixture_path("disc25")
+
+
+@pytest.fixture(scope="session")
+def disc25_analysis(disc25_path):
+    """Run and cache full analysis for the bundled disc25 fixture."""
+    return _analyze_fixture(disc25_path)
+
+
 @pytest.fixture
 def cli_runner() -> Callable[..., subprocess.CompletedProcess[str]]:
     """Return helper to invoke `python -m bdpl.cli` consistently in tests."""

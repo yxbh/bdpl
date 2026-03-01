@@ -32,6 +32,10 @@ pytestmark = pytest.mark.integration
         ("disc19_analysis", 1, ["00002.mpls"]),
         ("disc20_analysis", 1, ["00002.mpls"]),
         ("disc21_analysis", 1, ["00002.mpls"]),
+        ("disc22_analysis", 5, ["00002.mpls"] * 5),
+        ("disc23_analysis", 5, ["00002.mpls"] * 5),
+        ("disc24_analysis", 3, ["00002.mpls"] * 3),
+        ("disc25_analysis", 1, ["00002.mpls"]),
     ],
 )
 def test_disc_episode_expectation_matrix(
@@ -69,6 +73,10 @@ def test_disc_episode_expectation_matrix(
         ("disc19_analysis", 1, 1),  # 1 digital archive (hint-backed)
         ("disc20_analysis", 1, 1),  # 1 extra (trailer)
         ("disc21_analysis", 1, 1),  # 1 digital archive
+        ("disc22_analysis", 0, 0),  # chapter-split disc with no extras
+        ("disc23_analysis", 0, 0),  # chapter-split disc with no extras
+        ("disc24_analysis", 8, 8),  # 1 extra + 3 commentary + 4 creditless ED
+        ("disc25_analysis", 1, 1),  # 1 digital archive
     ],
 )
 def test_disc_special_visibility_expectation_matrix(
@@ -110,6 +118,10 @@ def test_disc_special_visibility_expectation_matrix(
         "disc19_analysis",
         "disc20_analysis",
         "disc21_analysis",
+        "disc22_analysis",
+        "disc23_analysis",
+        "disc24_analysis",
+        "disc25_analysis",
     ],
 )
 def test_disc_episode_segment_boundaries_matrix(
@@ -155,6 +167,10 @@ def test_disc_episode_segment_boundaries_matrix(
         "disc19_analysis",
         "disc20_analysis",
         "disc21_analysis",
+        "disc22_analysis",
+        "disc23_analysis",
+        "disc24_analysis",
+        "disc25_analysis",
     ],
 )
 def test_disc_special_boundary_semantics_matrix(
@@ -207,6 +223,10 @@ def test_disc_special_boundary_semantics_matrix(
         ("disc19_analysis", 0),
         ("disc20_analysis", 0),
         ("disc21_analysis", 0),
+        ("disc22_analysis", 0),
+        ("disc23_analysis", 0),
+        ("disc24_analysis", 0),
+        ("disc25_analysis", 0),
     ],
 )
 def test_disc_special_chapter_split_expectation_matrix(
@@ -242,6 +262,10 @@ def test_disc_special_chapter_split_expectation_matrix(
         ("disc19_analysis", "TEST DISC 19"),
         ("disc20_analysis", "TEST DISC 20"),
         ("disc21_analysis", "TEST DISC 21"),
+        ("disc22_analysis", "TEST DISC 22"),
+        ("disc23_analysis", "TEST DISC 23"),
+        ("disc24_analysis", "TEST DISC 24"),
+        ("disc25_analysis", "TEST DISC 25"),
     ],
 )
 def test_disc_title_extraction_matrix(
