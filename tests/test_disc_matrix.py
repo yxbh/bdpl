@@ -36,6 +36,10 @@ pytestmark = pytest.mark.integration
         ("disc23_analysis", 5, ["00002.mpls"] * 5),
         ("disc24_analysis", 3, ["00002.mpls"] * 3),
         ("disc25_analysis", 1, ["00002.mpls"]),
+        ("disc26_analysis", 3, ["00002.mpls", "00003.mpls", "00004.mpls"]),
+        ("disc27_analysis", 3, ["00002.mpls", "00003.mpls", "00004.mpls"]),
+        ("disc28_analysis", 3, ["00002.mpls", "00003.mpls", "00004.mpls"]),
+        ("disc29_analysis", 1, ["00002.mpls"]),
     ],
 )
 def test_disc_episode_expectation_matrix(
@@ -77,6 +81,10 @@ def test_disc_episode_expectation_matrix(
         ("disc23_analysis", 0, 0),  # chapter-split disc with no extras
         ("disc24_analysis", 8, 8),  # 1 extra + 3 commentary + 4 creditless ED
         ("disc25_analysis", 1, 1),  # 1 digital archive
+        ("disc26_analysis", 15, 15),  # 2 commentary + 4 creditless_ed + 9 extra
+        ("disc27_analysis", 15, 15),  # 2 commentary + 6 creditless_ed + 7 extra
+        ("disc28_analysis", 13, 13),  # 2 commentary + 7 creditless_ed + 4 extra
+        ("disc29_analysis", 3, 3),  # 3 digital archives
     ],
 )
 def test_disc_special_visibility_expectation_matrix(
@@ -122,6 +130,10 @@ def test_disc_special_visibility_expectation_matrix(
         "disc23_analysis",
         "disc24_analysis",
         "disc25_analysis",
+        "disc26_analysis",
+        "disc27_analysis",
+        "disc28_analysis",
+        "disc29_analysis",
     ],
 )
 def test_disc_episode_segment_boundaries_matrix(
@@ -171,6 +183,10 @@ def test_disc_episode_segment_boundaries_matrix(
         "disc23_analysis",
         "disc24_analysis",
         "disc25_analysis",
+        "disc26_analysis",
+        "disc27_analysis",
+        "disc28_analysis",
+        "disc29_analysis",
     ],
 )
 def test_disc_special_boundary_semantics_matrix(
@@ -227,6 +243,10 @@ def test_disc_special_boundary_semantics_matrix(
         ("disc23_analysis", 0),
         ("disc24_analysis", 0),
         ("disc25_analysis", 0),
+        ("disc26_analysis", 0),
+        ("disc27_analysis", 0),
+        ("disc28_analysis", 0),
+        ("disc29_analysis", 0),
     ],
 )
 def test_disc_special_chapter_split_expectation_matrix(
@@ -266,6 +286,10 @@ def test_disc_special_chapter_split_expectation_matrix(
         ("disc23_analysis", "TEST DISC 23"),
         ("disc24_analysis", "TEST DISC 24"),
         ("disc25_analysis", "TEST DISC 25"),
+        ("disc26_analysis", "TEST DISC 26"),
+        ("disc27_analysis", "TEST DISC 27"),
+        ("disc28_analysis", "TEST DISC 28"),
+        ("disc29_analysis", "TEST DISC 29"),
     ],
 )
 def test_disc_title_extraction_matrix(
