@@ -85,6 +85,7 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
             # Build title → playlist mapping via index titles → movie objects
             obj_playlists: dict[int, list[int]] = {}
             obj_play_marks: dict[int, list[tuple[int, int]]] = {}
+            obj_jump_titles: dict[int, list[int]] = {}
             for obj in mo.objects:
                 if obj.referenced_playlists:
                     obj_playlists[obj.object_id] = obj.referenced_playlists
@@ -96,10 +97,14 @@ def _parse_disc_hints(bdmv_path: Path, clips: dict[str, ClipInfo] | None = None)
                 ]
                 if marks:
                     obj_play_marks[obj.object_id] = marks
+                jts = obj.referenced_titles
+                if jts:
+                    obj_jump_titles[obj.object_id] = jts
             hints["movie_objects"] = {
                 "count": len(mo.objects),
                 "obj_playlists": obj_playlists,
                 "obj_play_marks": obj_play_marks,
+                "obj_jump_titles": obj_jump_titles,
             }
         except Exception:
             log.debug("Failed to parse MovieObject.bdmv", exc_info=True)
@@ -289,6 +294,16 @@ def _detect_special_features(
             # All buttons on this page target the same title — this is
             # either the main-play page or a chapter-selection page.
             chapter_selection_jt.update(jts)
+            continue
+        # A page where every button targets an episode playlist is an
+        # episode-selection page (e.g. per-episode CHAPTER menu).
+        all_episode = all(
+            title_to_mpls.get(jt_val - 1) in ep_playlists
+            for jt_val in jts
+            if title_to_mpls.get(jt_val - 1) is not None
+        )
+        if all_episode:
+            chapter_selection_jt.update(jts)
 
     # --- Walk IG hints and build features -----------------------------------
     seen: set[tuple[str, int | None]] = set()
@@ -373,8 +388,11 @@ def _detect_special_features(
     # Supplement with title-hint specials not already covered by IG buttons.
     title_hint_entries = _title_hint_non_episode_entries(hints, classifications, episodes)
     existing_keys = {(feature.playlist, feature.chapter_start) for feature in features}
+    nav_playlists = _nav_playlists_from_hints(hints)
     for mpls, chapter_starts in title_hint_entries:
         if mpls in variant_mpls:
+            continue
+        if mpls in nav_playlists:
             continue
         pl = pl_by_name.get(mpls)
         if pl is None:
@@ -477,15 +495,35 @@ def _nav_playlists_from_hints(hints: dict) -> set[str]:
 
     These are navigation playlists (disc intro, menu background) and should
     not be treated as special features.
+
+    Follows one level of JumpTitle indirection: if the first_playback MO
+    jumps to a title whose MO plays a playlist, that playlist is included.
     """
     index_hints = hints.get("index", {})
-    obj_pl = hints.get("movie_objects", {}).get("obj_playlists", {})
+    mo_hints = hints.get("movie_objects", {})
+    obj_pl = mo_hints.get("obj_playlists", {})
+    obj_jt = mo_hints.get("obj_jump_titles", {})
     nav: set[str] = set()
+
+    # Build title → movie_object map for JumpTitle resolution.
+    title_to_obj: dict[int, int] = {
+        entry["title"]: entry["movie_object"] for entry in index_hints.get("titles", [])
+    }
+
     for key in ("first_playback_obj", "top_menu_obj"):
         obj_id = index_hints.get(key)
-        if obj_id is not None:
-            for pl_num in obj_pl.get(obj_id, []):
-                nav.add(f"{pl_num:05d}.mpls")
+        if obj_id is None:
+            continue
+        # Direct PlayPl commands.
+        for pl_num in obj_pl.get(obj_id, []):
+            nav.add(f"{pl_num:05d}.mpls")
+        # Follow JumpTitle → title → MO → PlayPl (one level).
+        for jt_num in obj_jt.get(obj_id, []):
+            title_idx = jt_num - 1  # JumpTitle operand is 1-based
+            target_obj = title_to_obj.get(title_idx)
+            if target_obj is not None:
+                for pl_num in obj_pl.get(target_obj, []):
+                    nav.add(f"{pl_num:05d}.mpls")
     return nav
 
 

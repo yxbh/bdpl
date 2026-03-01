@@ -31,11 +31,11 @@ class TestDisc28Episodes:
 
 class TestDisc28Specials:
     def test_special_count(self, disc28_analysis: DiscAnalysis) -> None:
-        assert len(disc28_analysis.special_features) == 13
+        assert len(disc28_analysis.special_features) == 10
 
-    def test_has_commentary(self, disc28_analysis: DiscAnalysis) -> None:
+    def test_no_commentary(self, disc28_analysis: DiscAnalysis) -> None:
         commentary = [sf for sf in disc28_analysis.special_features if sf.category == "commentary"]
-        assert len(commentary) == 2
+        assert len(commentary) == 0
 
     def test_has_creditless_ed(self, disc28_analysis: DiscAnalysis) -> None:
         creditless = [
