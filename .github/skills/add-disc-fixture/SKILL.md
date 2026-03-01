@@ -70,6 +70,11 @@ If counts don't match → proceed to step 4 (debug).
 See [debugging guide](./references/debug-analysis.md) for systematic
 investigation of episode/special count mismatches.
 
+**Important**: When fixing mismatches, prefer structural signals over
+numeric thresholds.  Study chapter durations, IG menu structure, and
+navigation data across multiple fixtures — don't just look at the one
+that broke.  The debugging guide's "How to Fix" section has details.
+
 ### 5. Extract ICS Menu Data
 
 Find the menu clip (usually a short m2ts with IG streams, often clip 00003

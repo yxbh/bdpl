@@ -175,8 +175,33 @@ Output includes: `schema_version`, `disc`, `playlists`, `episodes`, `special_fea
 - Special feature detection is in `_detect_special_features()` — uses IG JumpTitle buttons pointing to non-episode playlists
 - `JumpTitle(N)` in HDMV commands is **1-based** — convert to 0-based index title with `N - 1`
 - Chapter-split features: when a button sets `reg2` before `JumpTitle`, it selects a chapter within the target playlist (multi-feature playlists)
-- Playlist classifications are heuristic-based; new disc patterns may need new rules
 - Segment keys use quantization (default ±250ms) to handle tiny timing variances
+
+### Fixing Analysis Mismatches — Structural Signals over Thresholds
+
+When a new disc produces wrong episode or special counts, **do not** add numeric
+thresholds or ratio guards.  Instead:
+
+1. **Study the data** — dump chapter durations, IG menu buttons, segment labels,
+   and MovieObject navigation across the failing disc AND existing fixtures that
+   work correctly.  Look for structural patterns that differentiate the two cases.
+2. **Identify a structural signal** — something the disc data tells you about its
+   own content type (e.g. repeating OP/body/ED chapter cycle for episodes,
+   IG button-per-page counts matching chapters-per-episode, title-hint references
+   in navigation commands).
+3. **Require positive evidence** — the code should ask "does the data say this IS
+   X?" rather than "does the data say this is NOT X?".  Negative guards based on
+   thresholds (like `max_chapters_per_episode = 7`) are brittle and will break on
+   the next disc that doesn't match the assumed range.
+4. **Combine signals** — when one signal isn't sufficient alone, combine multiple
+   independent signals (e.g. IG marks + chapter periodicity + button-per-page).
+   Each signal lowers the confidence bar, but at least one must be present.
+
+Examples of structural signals already in use:
+- **Chapter periodicity** (`_detect_episode_periodicity`): detects repeating
+  OP (~90 s) / body / ED (~90 s) / preview (~30 s) cycle in chapter durations
+- **IG chapter marks**: JT + reg2 buttons directly encode episode boundaries
+- **Digital archive multi-signal**: item count + title hint + no-audio streams
 
 ## Copyright & Fixture Guidelines
 - **NEVER commit copyrighted media content** (m2ts video/audio streams, full disc images, cover art, subtitle tracks, etc.) to the repository.
