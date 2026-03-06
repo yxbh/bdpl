@@ -395,7 +395,7 @@ def _disc_name(analysis: DiscAnalysis) -> str:
     if analysis.disc_title:
         return _sanitize_filename(analysis.disc_title)
     bdmv = Path(analysis.path).resolve()
-    # BDMV/ is typically inside a disc folder like UCG_0080_D1/BDMV
+    # BDMV/ is typically inside a disc folder like DISC_VOL1/BDMV
     parent = bdmv.parent
     if parent.name and parent.name != bdmv.anchor:
         return parent.name
